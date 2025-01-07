@@ -1,0 +1,240 @@
+---
+title: "Untitled"
+author: "Johan Zicola"
+date: '2025-01-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objective
+
+Di and Kathi proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
+
+The goal is to compare transcripts of different species and see if they are targeted by the designed dsRNAs used to kill the CSFB.
+
+* Assemble the transcripts for each species
+* Map the designed dsRNAs (50 or so designed) to these transcripts with allowed mismatches (do 0, 1, and 2)
+* Get a list of candidate target transcripts
+
+Check Cedden 2024 (https://resjournals.onlinelibrary.wiley.com/doi/10.1111/imb.12942) for the dsRNA design and off-target analysis. He developped an online tool to design dsRNAs (https://dsrip.uni-goettingen.de/efficiency).
+
+## Data
+
+Data are in `/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects`
+
+Summary statistics for raw data:
+
+| Sample | Length(bp) | TotalReads            |
+|--------|------------|-----------------------|
+| 01_Ad  | 100;100    |           64,769,548  |
+| 02_Pm  | 100;100    |           56,305,457  |
+| 03_Zt  | 100;100    |           50,054,875  |
+| 04_Asp | 100;100    |           42,581,758  |
+| 05_G   | 100;100    |           41,668,796  |
+| 06_Ol  | 100;100    |           57,482,693  |
+| 07_Pr  | 100;100    |           47,960,411  |
+| 08_Ar  | 100;100    |           44,601,099  |
+
+We have between 44 and 64 M paired-end reads.
+
+fastqc
+
+```{bash, eval=FALSE}
+f *fq.gz > list_fastq.txt
+
+while read i; do srun --partition medium fastqc $i -o fastqc_reports/ & done < list_fastq.txt
+```
+
+
+## Trimming
+
+Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#
+#SBATCH --job-name=trimming_cutadapt
+#SBATCH --nodes=1
+#SBATCH --ntasks=1 
+#SBATCH --mem=16000
+#SBATCH --output=slurm.%A.%a.out
+#SBATCH --error=slurm.%A.%a.err
+#SBATCH --partition=medium
+#SBATCH --time=02:00:00
+#SBATCH --constraint=scratch
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --array=1-8
+
+module load cutadapt/4.4
+
+file_name=$(find . -type f -name "*fq.gz" | \
+cut -d_ -f1-4 | sort | uniq | sed -n ${SLURM_ARRAY_TASK_ID}p)
+
+cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT \
+    --quality-base 33 --max-n 0  -o ${file_name}_1.trimmed.fq \
+    -p ${file_name}_2.trimmed.fq ${file_name}_1.fq.gz ${file_name}_2.fq.gz
+    
+```
+
+The Ar sample shows a polyA adaptor contamination that is gradual from the beginning to the end of the read. It also contains a lower GC content than all other samples. 
+
+Number of reads after trimming:
+
+```{bash, eval=FALSE}
+for i in *fq; do srun --partition medium fastqc $i -o fastqc_output/ & done
+
+cut -f1,6 multiqc_general_stats.txt
+```
+
+
+| Sample      | TotalReads  |
+|-------------|-------------|
+| 01_Ad_L1_1  | 63,577,928  |
+| 01_Ad_L1_2  | 63,577,928  |
+| 02_Pm_L1_1  | 55,269,387  |
+| 02_Pm_L1_2  | 55,269,387  |
+| 03_Zt_L1_1  | 49,128,635  |
+| 03_Zt_L1_2  | 49,128,635  |
+| 04_Asp_L1_1 | 41,800,974  |
+| 04_Asp_L1_2 | 41,800,974  |
+| 05_G_L1_1   | 40,906,340  |
+| 05_G_L1_2   | 40,906,340  |
+| 06_Ol_L1_1  | 56,417,880  |
+| 06_Ol_L1_2  | 56,417,880  |
+| 07_Pr_L1_1  | 47,070,196  |
+| 07_Pr_L1_2  | 47,070,196  |
+| 08_Ar_L1_1  | 43,759,260  |
+| 08_Ar_L1_2  | 43,759,260  |
+
+
+# Trinity
+
+See reference publication https://pmc.ncbi.nlm.nih.gov/articles/PMC3875132/#S2
+
+```{bash, eval=FALSE}
+
+wget https://github.com/trinityrnaseq/trinityrnaseq/releases/download/Trinity-v2.15.2/trinityrnaseq-v2.15.2.FULL.tar.gz
+
+
+tar -xzvf trinityrnaseq-v2.15.2.FULL.tar.gz
+
+cd trinityrnaseq-v2.15.2
+
+module load cmake
+
+make
+
+# Add to .bashrc
+export PATH="${PATH}:/usr/users/zicola/bin/trinityrnaseq-v2.15.2"
+
+```
+
+
+
+Dependencies of Trinity were pre-installed on our HPC and loaded using [Module](https://modules.readthedocs.io/en/latest/index.html)
+
+### Run
+
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=test
+#SBATCH --nodes=1
+#SBATCH --time=00:00:05
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=10M
+#SBATCH --partition=medium
+
+echo $INPUT_FASTQ_LEFT
+echo $INPUT_FASTQ_RIGHT
+echo $output_dir
+
+```
+
+```{bash, eval=FALSE}
+
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fqX,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Ad test.sh
+
+```
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=Trinity
+#SBATCH --nodes=1
+#SBATCH --time=48:00:00
+#SBATCH --ntasks-per-node=8
+#SBATCH --mem=110gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=Trinity.%J.out
+#SBATCH --error=Trinity.%J.err
+
+mem_bytes=$(</sys/fs/cgroup/memory/slurm/uid_${SLURM_JOB_UID}/job_${SLURM_JOB_ID}/memory.limit_in_bytes)
+mem_gbytes=$(( $mem_bytes / 1024 **3 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "  I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+export PATH="$PATH:/usr/users/zicola/bin/trinityrnaseq-v2.15.2/"
+
+module purge
+
+module load samtools python/3.9.0 openjdk/17.0.0_35 salmon/0.10.2 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.12
+
+Trinity \
+      --seqType fq \
+      --max_memory 100G \
+      --left $INPUT_FASTQ_LEFT \
+      --right $INPUT_FASTQ_RIGHT \
+      --SS_lib_type RF \
+      --output $OUTPUT_DIR \
+      --CPU $SLURM_NTASKS_PER_NODE \
+
+```
+
+```{bash, eval=FALSE}
+# generic command
+sbatch  --export=INPUT_FASTQ_LEFT=X,INPUT_FASTQ_RIGHT=Y,output_dir=trinity_output trinity_run.sh
+
+# Ad
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Ad trinity_run.sh
+
+# Pm
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Pm trinity_run.sh
+
+# Zt
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Zt trinity_run.sh
+
+# Asp
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Asp trinity_run.sh
+
+# G
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/G trinity_run.sh
+
+# Ol
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Ol trinity_run.sh
+
+# Pr
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Pr trinity_run.sh
+
+# Ar
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,output_dir=trinity_output/Ar trinity_run.sh
+
+```
+
+
+
+# Off-target analysis
+
+Use Doga's script (https://figshare.com/articles/dataset/_i_in_silico_i_off-target_analysis_of_lethal_genes_in_cabbage_stem_flea_beetle/25283683?file=44671225)
