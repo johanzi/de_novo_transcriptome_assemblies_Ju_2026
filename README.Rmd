@@ -136,51 +136,6 @@ export PATH="${PATH}:/usr/users/zicola/bin/trinityrnaseq-v2.15.2"
 Dependencies of Trinity were pre-installed on our HPC and loaded using [Module](https://modules.readthedocs.io/en/latest/index.html)
 
 
-
-## Test run Trinity v2.15.2
-
-```{bash, eval=FALSE}
-cd /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly
-```
-
-
-```{bash, eval=FALSE}
-
-#!/bin/bash
-#SBATCH --job-name=Trinity_test
-#SBATCH --nodes=1
-#SBATCH --time=00:10:00
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=3gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity_test.%J.out
-#SBATCH --error=Trinity_test.%J.err
-
-module purge
-
-module load rev/21.12 python/3.9.0 openjdk/17.0.0_35 salmon/1.0.0 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.19
-
-TRINITY_HOME="/usr/users/zicola/bin/trinityrnaseq-v2.15.2"
-
-${TRINITY_HOME}/Trinity --seqType fq --max_memory 2G \
-              --left reads.left.fq.gz \
-              --right reads.right.fq.gz \
-              --SS_lib_type RF \
-              --CPU 1 \
-              --no_cleanup
-
-```
-
-```{bash, eval=FALSE}
-sbatch sbatch_test.sh
-```
-
-Problem with Java
-
-
-
 ## Trinity with apptainer
 
 ```{bash, eval=FALSE}
@@ -199,114 +154,29 @@ Problem with Java
 
 module purge
 
-module load rev/21.12 python/3.9.0 openjdk/17.0.0_35 salmon/1.0.0 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.19 apptainer
+module load apptainer
 
-apptainer exec --bind /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
+apptainer exec --bind /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly -e trinityrnaseq.v2.15.1.simg  Trinity \
           --seqType fq \
           --SS_lib_type RF \
-          --left reads.left.fq.gz  \
-          --right reads.right.fq.gz \
+          --left /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly/reads.left.fq.gz  \
+          --right /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly/reads.right.fq.gz \
           --max_memory 18G --CPU 10 \
-          --output trinity_out_dir
+          --output /usr/users/zicola/bin/trinityrnaseq-v2.15.2/sample_data/test_Trinity_Assembly/trinity_out_dir
 
 ```
 
 
-```{bash, eval=FALSE}
-#!/bin/bash
-#SBATCH --job-name=Trinity_test
-#SBATCH --nodes=1
-#SBATCH --time=01:00:00
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=20gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity_test.%J.out
-#SBATCH --error=Trinity_test.%J.err
-
-module purge
-
-module load rev/21.12 python/3.9.0 openjdk/17.0.0_35 salmon/1.0.0 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.19 apptainer
-
-apptainer exec -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
-          --seqType fq \
-          --SS_lib_type RF \
-          --left reads.left.fq.gz  \
-          --right reads.right.fq.gz \
-          --max_memory 18G --CPU 10 \
-          --output trinity_out_dir
-```
-
+### Full run
 
 
 ```{bash, eval=FALSE}
 #!/bin/bash
 #SBATCH --job-name=Trinity
 #SBATCH --nodes=1
-#SBATCH --time=00:01:00
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=1gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity.%J.out
-#SBATCH --error=Trinity.%J.err
-
-echo $SLURM_MEM_PER_NODE
-
-mem_gbytes=$(( $SLURM_MEM_PER_NODE / 1024 **3 ))
-
-echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
-echo "${SLURM_CPUS_PER_TASK} CPUs are used per task"
-
-export PATH="$PATH:/usr/users/zicola/bin/trinityrnaseq-v2.15.2/"
-
-module purge
-
-module load rev/21.12 python/3.9.0 openjdk/17.0.0_35 salmon/1.0.0 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.19
-
-echo "Now proceed with Trinity"
-
-echo "Read1 file = $INPUT_FASTQ_LEFT"
-echo "Read2 file = $INPUT_FASTQ_RIGHT"
-echo "Output dir = $OUTPUT_DIR"
-
-Trinity \
-      --seqType fq \
-      --max_memory 1G \
-      --SS_lib_type RF \
-      --CPU $SLURM_CPUS_PER_TASK \
-      --left $INPUT_FASTQ_LEFT \
-      --right $INPUT_FASTQ_RIGHT \
-      --output $OUTPUT_DIR
-
-
-```
-
-```{bash, eval=FALSE}
-sbatch --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=/home/uni08/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/Ad/trinity_out_dir test.sh
-
-sbatch --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ad/trinity_out_dir test.sh
-
-
-```
-
-
-
-
-# test v2.15.1
-
-```{bash, eval=FALSE}
-#!/bin/bash
-#SBATCH --job-name=Trinity
-#SBATCH --nodes=1
-#SBATCH --time=00:10:00
+#SBATCH --time=00:05:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=10gb
+#SBATCH --mem=2gb
 #SBATCH --partition=medium
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
@@ -320,106 +190,27 @@ echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partiti
 echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
 echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
 
-export PATH="${PATH}:/usr/users/zicola/bin/trinityrnaseq-v2.15.1"
-
 module purge
 
-module load rev/21.12 salmon/1.0.0 jellyfish/2.2.10 bowtie/2.3.4.1 python/3.9.0 openjdk samtools
+module load apptainer
 
+path_dir="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
 
-Trinity \
-      --seqType fq \
-      --max_memory 8G \
-      --left $INPUT_FASTQ_LEFT \
-      --right $INPUT_FASTQ_RIGHT \
-      --SS_lib_type RF \
-      --output $OUTPUT_DIR \
-      --CPU $SLURM_CPUS_PER_TASK
+apptainer exec --bind $path_dir -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
+          --seqType fq \
+          --SS_lib_type RF \
+          --left ${path_dir}/$INPUT_FASTQ_LEFT  \
+          --right ${path_dir}/$INPUT_FASTQ_RIGHT \
+          --max_memory 1G --CPU $SLURM_CPUS_PER_TASK \
+          --output ${path_dir}/$OUTPUT_DIR
 
 ```
 
-
-```{r}
+```{bash, eval=FALSE}
+# Ad
 sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ad/trinity_out_dir test.sh
+
 ```
-
-# Test v2.11
-
-```{bash, eval=FALSE}
-#!/bin/bash
-#SBATCH --job-name=Trinity
-#SBATCH --nodes=1
-#SBATCH --time=00:10:00
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=10gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity.%J.out
-#SBATCH --error=Trinity.%J.err
-    
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
-echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
-
-export PATH="${PATH}:/usr/users/zicola/bin/trinityrnaseq-v2.15.1"
-
-module purge
-
-module load rev/21.12 trinity/2.11.0 salmon/0.9.1
-
-Trinity \
-      --seqType fq \
-      --max_memory 8G \
-      --left $INPUT_FASTQ_LEFT \
-      --right $INPUT_FASTQ_RIGHT \
-      --SS_lib_type RF \
-      --output $OUTPUT_DIR \
-      --CPU $SLURM_CPUS_PER_TASK
-```
-
-```{r}
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ad/trinity_out_dir test.sh
-```
-
-
-```{bash, eval=FALSE}
-
-#!/bin/bash
-#SBATCH --job-name=Trinity
-#SBATCH --nodes=1
-#SBATCH --time=00:10:00
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=10gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity.%J.out
-#SBATCH --error=Trinity.%J.err
-    
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
-echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
-
-module purge
-
-module load rev/21.12 trinity/2.11.0 salmon/0.9.1
-
-Trinity \
-          --seqType fq \
-          --SS_lib_type RF \
-          --left reads.left.fq.gz  \
-          --right reads.right.fq.gz \
-          --max_memory 18G --CPU 10 \
-          --output trinity_out_dir
-```
-
 
 
 ```{bash, eval=FALSE}
@@ -444,27 +235,24 @@ echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute n
 
 module purge
 
-module load rev/21.12 python/3.9.0 openjdk/17.0.8.1_1 salmon/1.0.0 bowtie/2.3.4.1 jellyfish/2.2.10 samtools/1.19
+module load apptainer
 
-Trinity \
-      --seqType fq \
-      --max_memory 100G \
-      --left $INPUT_FASTQ_LEFT \
-      --right $INPUT_FASTQ_RIGHT \
-      --SS_lib_type RF \
-      --output $OUTPUT_DIR \
-      --CPU $SLURM_CPUS_PER_TASK
+path_dir="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+apptainer exec --bind $path_dir -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
+          --seqType fq \
+          --SS_lib_type RF \
+          --left ${path_dir}/$INPUT_FASTQ_LEFT  \
+          --right ${path_dir}/$INPUT_FASTQ_RIGHT \
+          --max_memory 100G --CPU $SLURM_CPUS_PER_TASK \
+          --output ${path_dir}/$OUTPUT_DIR
 
 ```
 
-Run for Trinity each species:
-
 ```{bash, eval=FALSE}
-# generic command
-sbatch  --export=INPUT_FASTQ_LEFT=X,INPUT_FASTQ_RIGHT=Y,OUTPUT_DIR=trinity_output trinity_run.sh
-
 # Ad
 sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ad/trinity_out_dir trinity_run.sh
+
 
 # Pm
 sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Pm trinity_run.sh
@@ -487,7 +275,10 @@ sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FAST
 # Ar
 sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ar trinity_run.sh
 
+
 ```
+
+
 
 
 
