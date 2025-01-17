@@ -1,0 +1,477 @@
+---
+title: "other_scripts"
+author: "Johan Zicola"
+date: '2025-01-16'
+output: html_document
+---
+
+
+# Remove empty reads
+
+```{bash, eval=FALSE}
+
+while read i; do
+  srun -p medium -t 01:20:00 --cpus-per-task=10 cutadapt -j 10 --minimum-length 25 \
+  -o ${i}_L1_1.trimmed.min25.fq -p ${i}_L1_2.trimmed.min25.fq \
+  ${i}_L1_1.trimmed.fq ${i}_L1_2.trimmed.fq &
+done < list.txt
+
+```
+
+# Trimming with trimmomatic
+
+```{bash, eval=FALSE}
+
+module load rev/21.12 trimmomatic openjdk
+
+PATH_ADAPTER="/usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/adapters/"
+
+srun -p medium -t 00:30:00 --mem=12G --cpus-per-task=10 \
+java -Xmx10G -jar /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/trimmomatic-0.36.jar \
+PE -phred33 -threads 10 \
+raw_data/01_Ad/01_Ad_L1_1.fq.gz \
+raw_data/01_Ad/01_Ad_L1_2.fq.gz \
+trimmed_reads_trimmomatic/01_Ad_L1_1.paired.fq.gz \
+trimmed_reads_trimmomatic/01_Ad_L1_1.unpaired.fq.gz \
+trimmed_reads_trimmomatic/01_Ad_L1_2.paired.fq.gz \
+trimmed_reads_trimmomatic/01_Ad_L1_2.unpaired.fq.gz \
+ILLUMINACLIP:"/usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/adapters/TruSeq2-SE.fa":2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50 &
+
+Input Read Pairs: 64769548 Both Surviving: 63780516 (98.47%) Forward Only Surviving: 228552 (0.35%) Reverse Only Surviving: 744814 (1.15%) Dropped: 15666 (0.02%)
+TrimmomaticPE: Completed successfully
+
+seqkit stats 01_Ad_L1_1.paired.fq.gz 01_Ad_L1_2.paired.fq.gz
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                     format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad_L1_1.paired.fq.gz  FASTQ   DNA   63,780,516  6,351,162,309       50     99.6      100
+01_Ad_L1_2.paired.fq.gz  FASTQ   DNA   63,780,516  6,350,850,563       50     99.6      100
+
+# Same number of reads in each file
+
+module load fastqc/0.11.4
+
+srun -p medium -t 00:50:00 fastqc 01_Ad_L1_2.paired.fq.gz &
+srun -p medium -t 00:50:00 fastqc 01_Ad_L1_1.paired.fq.gz &
+
+```
+
+
+# Remove rRNA
+
+https://github.com/sortmerna/sortmerna
+
+Download v4.3 database (https://github.com/biocore/sortmerna/releases/download/v4.3.4/database.tar.gz)
+
+## Index database
+
+The docu recommends to use `smr_v4.3_default_db.fasta`
+
+```{r}
+mkdir ~/genomes/silva_rRNA_maize/smr_database && cd ~/genomes/silva_rRNA_maize/smr_database
+
+wget https://github.com/biocore/sortmerna/releases/download/v4.3.4/database.tar.gz
+
+tar -zxvf database.tar.gz
+
+seqkit stats smr_v4.3_default_db.fasta
+file                       format  type  num_seqs      sum_len  min_len  avg_len  max_len
+smr_v4.3_default_db.fasta  FASTA   RNA     73,977  133,533,894       91  1,805.1    4,380
+
+module load rev/21.12 sortmerna/20170809
+
+srun -t 00:50:00 --mem=20G -p medium indexdb_rna --ref smr_v4.3_default_db.fasta,smr_v4.3_default_db.idx -v
+
+```
+
+
+```{bash, eval=FALSE}
+\ls -1sh smr_v4.3_default*
+140M smr_v4.3_default_db.fasta
+662M smr_v4.3_default_db.idx.bursttrie_0.dat
+1.0M smr_v4.3_default_db.idx.kmer_0.dat
+1.2G smr_v4.3_default_db.idx.pos_0.dat
+4.0M smr_v4.3_default_db.idx.stats
+```
+
+4 index files are generated with a *dat extension.
+
+## Merge reads
+
+I tested with the R1 and R2 in separate files using two --read flags but the output contained only R2 sequences. When I merge the R1 and R2, it works. I just need to merge R1 and R2 and unmerge them afterwards
+
+```{bash, eval=FALSE}
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trimmed_reads
+
+mkdir merged_fastq
+
+module load rev/21.12 sortmerna/20170809
+
+while read i; do
+if [ -e merged_fastq/${i}.merged.fq ]; then
+  echo "$i already processed"
+else
+  srun -p medium --mem=2Gb --time=00:20:00 bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh ${i}_L1_1.trimmed.fq ${i}_L1_2.trimmed.fq  merged_fastq/${i}.merged.fq &
+fi
+done < list.txt
+
+
+```
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=merge_fastq
+#SBATCH --nodes=1
+#SBATCH --time=00:40:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=10gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=sortmerna.%J.out
+#SBATCH --error=sortmerna.%J.err
+#SBATCH --array=1-8
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+module purge
+
+module load rev/21.12 sortmerna/20170809
+
+i=$(sed -n ${SLURM_ARRAY_TASK_ID}p trimmed_reads/list.txt)
+
+bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh trimmed_reads/${i}_L1_1.trimmed.fq trimmed_reads/${i}_L1_2.trimmed.fq  trimmed_reads/merged_fastq/${i}.merged.fq
+
+```
+
+
+## sortmerna
+
+```{r}
+#!/bin/bash
+#SBATCH --job-name=sortmerna
+#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=50gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=sortmerna.%J.out
+#SBATCH --error=sortmerna.%J.err
+#SBATCH --array=1-8
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+module purge
+
+module load rev/21.12 sortmerna/20170809
+
+PATH_DB="/usr/users/zicola/genomes/silva_rRNA_maize/smr_database"
+
+i=$(sed -n ${SLURM_ARRAY_TASK_ID}p trimmed_reads/list.txt)
+
+sortmerna -a 1 --paired_in --fastx \
+    --ref ${PATH_DB}/smr_v4.3_default_db.fasta,${PATH_DB}/smr_v4.3_default_db.idx \
+    --reads trimmed_reads/merged_fastq/${i}.merged.fq \
+    --aligned rRNA_removed/${i}.aligned \
+    --other rRNA_removed/${i}.mRNA
+
+```
+
+```{bash, eval=FALSE}
+srun --pty -p medium --mem=50G --cpus-per-task=5 --time=01:00:00  bash
+
+i="02_Pm"
+
+module purge
+
+module load rev/21.12 sortmerna/20170809
+
+PATH_DB="/usr/users/zicola/genomes/silva_rRNA_maize/smr_database"
+
+sortmerna -a 5 --paired_in --fastx \
+    --ref ${PATH_DB}/smr_v5.3_default_db.fasta,${PATH_DB}/smr_v4.3_default_db.idx \
+    --reads trimmed_reads/merged_fastq/${i}.merged.fq \
+    --aligned rRNA_removed/${i}.aligned \
+    --other rRNA_removed/${i}.mRNA
+
+```
+
+Not one read mapped to the smr_v4.3_default_db database. This is very suspicious.
+
+
+```{bash, eval=FALSE}
+
+i="08_Ar"
+
+sortmerna -a 5 --paired_in --fastx \
+    --ref ${PATH_DB}/smr_v4.3_default_db.fasta,${PATH_DB}/smr_v4.3_default_db.idx \
+    --reads trimmed_reads/merged_fastq/${i}.merged.fq \
+    --aligned rRNA_removed/${i}.aligned \
+    --other rRNA_removed/${i}.mRNA
+
+```
+
+Still nothing mapping to rRNA database.
+
+
+
+## Unmerge fastq
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=unmerge_fastq
+#SBATCH --nodes=1
+#SBATCH --time=00:40:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=20gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=sortmerna.%J.out
+#SBATCH --error=sortmerna.%J.err
+#SBATCH --array=1-8
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+module purge
+
+module load rev/21.12 sortmerna/20170809
+
+i=$(sed -n ${SLURM_ARRAY_TASK_ID}p trimmed_reads/list.txt)
+
+bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh rRNA_removed/${i}.mRNA.fq rRNA_removed/${i}.R1.mRNA.fq rRNA_removed/${i}.R2.mRNA.fq
+
+
+```
+
+## Use bowtie2
+
+Index the database from sortmerna
+
+```{bash, eval=FALSE}
+cd /usr/users/zicola/genomes/silva_rRNA_maize/smr_database
+
+bowtie2-build -f smr_v4.3_default_db.fasta smr_v4_3_default_db
+```
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=rRNA_removal
+#SBATCH --nodes=1
+#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=50gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=rRNA_removal.%J.out
+#SBATCH --error=rRNA_removal.%J.err
+#SBATCH --array=1-8
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+module purge
+module load rev/21.12 bowtie2
+
+i=$(sed -n ${SLURM_ARRAY_TASK_ID}p trimmed_reads/list.txt)
+
+bowtie2 -p 10 --nofw --quiet --very-sensitive-local --phred33  \
+    -x /usr/users/zicola/genomes/silva_rRNA_maize/smr_database/smr_v4_3_default_db \
+    -1 trimmed_reads/${i}_L1_1.trimmed.fq  \
+    -2 trimmed_reads/${i}_L1_2.trimmed.fq \
+    --un-conc rRNA_removed/${i}.rRNA_removed.fq > /dev/null
+
+```
+
+
+```{bash, eval=FALSE}
+
+# Trimmed reads
+seqkit stats 01_Ad*
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                   format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad_L1_1.trimmed.fq  FASTQ   DNA   63,577,851  6,342,339,512        1     99.8      100
+01_Ad_L1_2.trimmed.fq  FASTQ   DNA   63,577,851  6,340,577,359        1     99.7      100
+
+
+# Trimmed reads and rRNA removal
+
+seqkit stats 01_Ad*
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                     format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad.rRNA_removed.1.fq  FASTQ   DNA   63,572,322  6,341,800,686        1     99.8      100
+01_Ad.rRNA_removed.2.fq  FASTQ   DNA   63,572,322  6,340,036,951        1     99.7      100
+
+
+```
+
+That is 5529 (63577851-63572322) reads removed out of 63M (.00877619%) so I really doubt rRNA contamination would affect the assembly.
+
+
+
+Do on all samples
+
+```{bash, eval=FALSE}
+cat stat.txt
+processed files:  16 / 16  ETA: 0s. done
+file                      format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad.rRNA_removed.1.fq   FASTQ   DNA   63,572,322  6,341,800,686        1     99.8      100
+01_Ad.rRNA_removed.2.fq   FASTQ   DNA   63,572,322  6,340,036,951        1     99.7      100
+02_Pm.rRNA_removed.1.fq   FASTQ   DNA   55,259,617  5,507,706,345       25     99.7      100
+02_Pm.rRNA_removed.2.fq   FASTQ   DNA   55,259,617  5,505,907,480       25     99.6      100
+03_Zt.rRNA_removed.1.fq   FASTQ   DNA   49,126,313  4,904,813,047       25     99.8      100
+03_Zt.rRNA_removed.2.fq   FASTQ   DNA   49,126,313  4,903,228,530       25     99.8      100
+04_Asp.rRNA_removed.1.fq  FASTQ   DNA   41,798,830  4,169,156,197       25     99.7      100
+04_Asp.rRNA_removed.2.fq  FASTQ   DNA   41,798,830  4,168,954,996       25     99.7      100
+05_G.rRNA_removed.1.fq    FASTQ   DNA   40,895,705  4,078,580,793       25     99.7      100
+05_G.rRNA_removed.2.fq    FASTQ   DNA   40,895,705  4,077,039,215       25     99.7      100
+06_Ol.rRNA_removed.1.fq   FASTQ   DNA   56,412,659  5,630,612,260       25     99.8      100
+06_Ol.rRNA_removed.2.fq   FASTQ   DNA   56,412,659  5,628,472,850       25     99.8      100
+07_Pr.rRNA_removed.1.fq   FASTQ   DNA   47,066,726  4,697,862,680       25     99.8      100
+07_Pr.rRNA_removed.2.fq   FASTQ   DNA   47,066,726  4,696,252,248       25     99.8      100
+08_Ar.rRNA_removed.1.fq   FASTQ   DNA   43,705,177  4,354,160,178       25     99.6      100
+08_Ar.rRNA_removed.2.fq   FASTQ   DNA   43,705,177  4,352,752,476       25     99.6      100
+
+```
+
+Compare with number of reads after trimming
+
+| sample      | reads after trimming | reads after bowtie2 rRNA filtering | difference | % trimmed reads |
+|-------------|----------------------|------------------------------------|------------|-----------------|
+| 01_Ad_L1_1  | 63,577,928           | 63,572,322                         | 5,606      | 0.0088%         |
+| 01_Ad_L1_2  | 63,577,928           | 63,572,322                         | 5,606      | 0.0088%         |
+| 02_Pm_L1_1  | 55,269,387           | 55,259,617                         | 9,770      | 0.0177%         |
+| 02_Pm_L1_2  | 55,269,387           | 55,259,617                         | 9,770      | 0.0177%         |
+| 03_Zt_L1_1  | 49,128,635           | 49,126,313                         | 2,322      | 0.0047%         |
+| 03_Zt_L1_2  | 49,128,635           | 49,126,313                         | 2,322      | 0.0047%         |
+| 04_Asp_L1_1 | 41,800,974           | 41,798,830                         | 2,144      | 0.0051%         |
+| 04_Asp_L1_2 | 41,800,974           | 41,798,830                         | 2,144      | 0.0051%         |
+| 05_G_L1_1   | 40,906,340           | 40,895,705                         | 10,635     | 0.0260%         |
+| 05_G_L1_2   | 40,906,340           | 40,895,705                         | 10,635     | 0.0260%         |
+| 06_Ol_L1_1  | 56,417,880           | 56,412,659                         | 5,221      | 0.0093%         |
+| 06_Ol_L1_2  | 56,417,880           | 56,412,659                         | 5,221      | 0.0093%         |
+| 07_Pr_L1_1  | 47,070,196           | 47,066,726                         | 3,470      | 0.0074%         |
+| 07_Pr_L1_2  | 47,070,196           | 47,066,726                         | 3,470      | 0.0074%         |
+| 08_Ar_L1_1  | 43,759,260           | 43,705,177                         | 54,083     | 0.1236%         |
+| 08_Ar_L1_2  | 43,759,260           | 43,705,177                         | 54,083     | 0.1236%         |
+
+The rRNA contamination
+
+
+## Use bowtie2 on Arb Silva Coleoptera database
+
+Search for taxonomy Coleoptera. Download fasta without gaps for the LSU and SSU hits (https://www.arb-silva.de/download)
+
++ 13765 SSU
++ 8776 LSU
+
+```{bash, eval=FALSE}
+
+cd /usr/users/zicola/genomes/rRNA_coleoptera
+
+tar -zxvf arb-silva.de_2025-01-16_id1372508.tgz
+mv arb-silva.de_2025-01-16_id1372508_tax_silva_trunc.fasta LSU_coleoptera.fasta
+
+tar -zxvf arb-silva.de_2025-01-16_id1372510.tgz
+mv arb-silva.de_2025-01-16_id1372510_tax_silva_trunc.fasta SSU_coleoptera.fasta
+
+seqkit stats *fasta
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                  format  type  num_seqs     sum_len  min_len  avg_len  max_len
+LSU_coleoptera.fasta  FASTA   RNA      8,776   5,944,179      300    677.3    3,238
+SSU_coleoptera.fasta  FASTA   RNA     13,768  16,277,792      300  1,182.3    2,645
+
+cat LSU_coleoptera.fasta SSU_coleoptera.fasta > LSU_SSU_coleoptera.fasta
+
+seqkit stats LSU_SSU_coleoptera.fasta
+file                      format  type  num_seqs     sum_len  min_len  avg_len  max_len
+LSU_SSU_coleoptera.fasta  FASTA   RNA     22,544  22,221,971      300    985.7    3,238
+
+
+bowtie2-build -f LSU_SSU_coleoptera.fasta LSU_SSU_coleoptera
+
+```
+
+Test with Ad
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=rRNA_removal
+#SBATCH --nodes=1
+#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=50gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=rRNA_removal.%J.out
+#SBATCH --error=rRNA_removal.%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+module purge
+module load rev/21.12 bowtie2
+
+bowtie2 -p 10 --nofw --quiet --very-sensitive-local --phred33  \
+    -x /usr/users/zicola/genomes/rRNA_coleoptera/LSU_SSU_coleoptera \
+    -1 trimmed_reads/01_Ad_L1_1.trimmed.fq  \
+    -2 trimmed_reads/01_Ad_L1_2.trimmed.fq \
+    --un-conc rRNA_removed/01_Ad.rRNA_removed_silva_coleptera.fq > /dev/null
+
+```
+
+```{bash, eval=FALSE}
+sbatch test_bowtie2.sh
+```
+
+
+```{bash, eval=FALSE}
+# Bowtie using smr database
+
+seqkit stats 01_Ad*
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                     format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad.rRNA_removed.1.fq  FASTQ   DNA   63,572,322  6,341,800,686        1     99.8      100
+01_Ad.rRNA_removed.2.fq  FASTQ   DNA   63,572,322  6,340,036,951        1     99.7      100
+
+
+# Bowtie using ARB Silva Coleoptera SSU + LSU database
+
+seqkit stats 01_Ad.rRNA_removed_silva_coleptera.*
+processed files:  2 / 2 [======================================] ETA: 0s. done
+file                                     format  type    num_seqs        sum_len  min_len  avg_len  max_len
+01_Ad.rRNA_removed_silva_coleptera.1.fq  FASTQ   DNA   63,574,766  6,342,041,048        1     99.8      100
+01_Ad.rRNA_removed_silva_coleptera.2.fq  FASTQ   DNA   63,574,766  6,340,277,246        1     99.7      100
+
+
+```
+
+63574766-63572322 = 2444. I can actually less reads mapping rRNA when using the Silva database for Coleptera (22,544 sequences) compared to the smr default database (73,977 sequences).

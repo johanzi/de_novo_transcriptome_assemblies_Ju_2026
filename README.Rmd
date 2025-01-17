@@ -9,20 +9,28 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Objective
+# Objective
 
 Di and Kathi proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
 
+
+# Insect species
+
 Insects collected and identified by Di:
 
-+ Anchomenus dorsalis
-+ Pterostichus melanarius
-+ Zabrus tenebrioides
-+ Amara similata
-+ Harpalus affinis
-+ Harpalus eous
-+ Poecilus cupreus
-+ Aphidius rhopalosiphi
+| library | species                  | basionym             | order       | NCBI taxonomy ID |
+|---------|--------------------------|----------------------|-------------|------------------|
+| 01_Ad   | Anchomenus dorsalis      |                      | Coleoptera  | 586010           |
+| 02_Pm   | Pterostichus melanarius  |                      | Coleoptera  | 60768            |
+| 03_Zt   | Zabrus tenebrioides      | Carabus tenebrioides | Coleoptera  | 272042           |
+| 04_Asp  | Amara similata           | Harpalus similatus   | Coleoptera  | 272013           |
+| 05_G    | Harpalus affinis         |                      | Coleoptera  | 247283           |
+| 06_Ol   | Harpalus eous            |                      | Coleoptera  | 2107211          |
+| 07_Pr   | Poecilus cupreus         | Pterostichus cupreus | Coleoptera  | 270614           |
+| 08_Ar   | Aphidius rhopalosiphi    |                      | Hymenoptera | 55891            |
+
++ morphology and species attributes: https://www.gbif.org/species/search?q=
++ Full taxonomy: https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi
 
 Besides Aphidius rhopalosiphi (parasitic wasp, Hymenoptera), all other 7 species are Coleoptera.
 
@@ -32,8 +40,6 @@ The goal is to compare transcripts of different species and see if they are targ
 * Get the full list of transcripts and the list of longest ORFs
 
 
-
-
 Off-target analysis done by the company:
 
 * Map the designed dsRNAs (50 or so designed) to these transcripts with allowed mismatches (do 0, 1, and 2)
@@ -41,7 +47,7 @@ Off-target analysis done by the company:
 
 Check Cedden 2024 (https://resjournals.onlinelibrary.wiley.com/doi/10.1111/imb.12942) for the dsRNA design and off-target analysis. He developped an online tool to design dsRNAs (https://dsrip.uni-goettingen.de/efficiency).
 
-## Data
+# Data
 
 Data are in `/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects`
 
@@ -75,7 +81,7 @@ https://southgreenplatform.github.io/tutorials//bioanalysis/trinity/#trimmomatic
 
 * Trim data with cutadapt to remove adapters
 
-## Trimming
+# Trimming
 
 Note that Trinity will skip reads of less than 25 bp so I can set the minimum size to 25 nt.
 
@@ -97,6 +103,14 @@ Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
 #SBATCH --array=1-8
+
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
 
 module load cutadapt/4.4
 
@@ -141,183 +155,9 @@ cut -f1,6 multiqc_general_stats.txt
 | 08_Ar_L1_2  | 43,759,260  |
 
 
+# Trinity (v2.15.1)
 
-
-# Remove empty reads
-
-```{bash, eval=FALSE}
-
-while read i; do
-  srun -p medium -t 01:20:00 --cpus-per-task=10 cutadapt -j 10 --minimum-length 25 \
-  -o ${i}_L1_1.trimmed.min25.fq -p ${i}_L1_2.trimmed.min25.fq \
-  ${i}_L1_1.trimmed.fq ${i}_L1_2.trimmed.fq &
-done < list.txt
-
-```
-
-
-
-
-# Trimming with trimmomatic
-
-```{bash, eval=FALSE}
-
-module load rev/21.12 trimmomatic openjdk
-
-PATH_ADAPTER="/usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/adapters/"
-
-srun -p medium -t 00:30:00 --mem=12G --cpus-per-task=10 \
-java -Xmx10G -jar /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/trimmomatic-0.36.jar \
-PE -phred33 -threads 10 \
-raw_data/01_Ad/01_Ad_L1_1.fq.gz \
-raw_data/01_Ad/01_Ad_L1_2.fq.gz \
-trimmed_reads_trimmomatic/01_Ad_L1_1.paired.fq.gz \
-trimmed_reads_trimmomatic/01_Ad_L1_1.unpaired.fq.gz \
-trimmed_reads_trimmomatic/01_Ad_L1_2.paired.fq.gz \
-trimmed_reads_trimmomatic/01_Ad_L1_2.unpaired.fq.gz \
-ILLUMINACLIP:"/usr/product/bioinfo/SL_7.0/BIOINFORMATICS/TRIMMOMATIC/0.36/adapters/TruSeq2-SE.fa":2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50 &
-
-Input Read Pairs: 64769548 Both Surviving: 63780516 (98.47%) Forward Only Surviving: 228552 (0.35%) Reverse Only Surviving: 744814 (1.15%) Dropped: 15666 (0.02%)
-TrimmomaticPE: Completed successfully
-
-seqkit stats 01_Ad_L1_1.paired.fq.gz 01_Ad_L1_2.paired.fq.gz
-processed files:  2 / 2 [======================================] ETA: 0s. done
-file                     format  type    num_seqs        sum_len  min_len  avg_len  max_len
-01_Ad_L1_1.paired.fq.gz  FASTQ   DNA   63,780,516  6,351,162,309       50     99.6      100
-01_Ad_L1_2.paired.fq.gz  FASTQ   DNA   63,780,516  6,350,850,563       50     99.6      100
-
-# Same number of reads in each file
-
-module load fastqc/0.11.4
-
-srun -p medium -t 00:50:00 fastqc 01_Ad_L1_2.paired.fq.gz &
-srun -p medium -t 00:50:00 fastqc 01_Ad_L1_1.paired.fq.gz &
-
-```
-
-
-# Remove rRNA
-
-https://github.com/sortmerna/sortmerna
-
-Download v4.3 database (https://github.com/biocore/sortmerna/releases/download/v4.3.4/database.tar.gz)
-
-### Index database
-
-The docu recommends to use `smr_v4.3_default_db.fasta`
-
-```{r}
-mkdir ~/genomes/silva_rRNA_maize/smr_database && cd ~/genomes/silva_rRNA_maize/smr_database
-
-wget https://github.com/biocore/sortmerna/releases/download/v4.3.4/database.tar.gz
-
-tar -zxvf database.tar.gz
-
-module load rev/21.12 sortmerna/20170809
-
-srun -t 00:50:00 --mem=20G -p medium indexdb_rna --ref smr_v4.3_default_db.fasta,smr_v4.3_default_db.idx -v
-
-```
-
-
-```{bash, eval=FALSE}
-\ls -1sh smr_v4.3_default*
-140M smr_v4.3_default_db.fasta
-662M smr_v4.3_default_db.idx.bursttrie_0.dat
-1.0M smr_v4.3_default_db.idx.kmer_0.dat
-1.2G smr_v4.3_default_db.idx.pos_0.dat
-4.0M smr_v4.3_default_db.idx.stats
-```
-
-4 index files are generated with a *dat extension.
-
-### Merge reads
-
-I tested with the R1 and R2 in separate files using two --read flags but the output contained only R2 sequences. When I merge the R1 and R2, it works. I just need to merge R1 and R2 and unmerge them afterwards
-
-```{bash, eval=FALSE}
-
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trimmed_reads
-
-mkdir merged_fastq
-
-module load rev/21.12 sortmerna/20170809
-
-while read i; do
-if [ -e merged_fastq/${i}.merged.fq ]; then
-  echo "$i already processed"
-else
-  echo "srun -p medium --mem=2Gb --time=00:20:00 bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh ${i}_L1_1.trimmed.fq ${i}_L1_2.trimmed.fq  merged_fastq/${i}.merged.fq" && srun -p medium --mem=2Gb --time=00:20:00 bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh ${i}_L1_1.trimmed.fq ${i}_L1_2.trimmed.fq  merged_fastq/${i}.merged.fq &
-fi
-done < list.txt
-
-
-```
-
-
-### sortmerna
-
-```{r}
-#!/bin/bash
-#SBATCH --job-name=sortmerna
-#SBATCH --nodes=1
-#SBATCH --time=01:00:00
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=10gb
-#SBATCH --partition=medium
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=sortmerna.%J.out
-#SBATCH --error=sortmerna.%J.err
-#SBATCH --array=1-8
-
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
-echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
-
-module purge
-
-module load rev/21.12 sortmerna/20170809
-
-PATH_DB="/usr/users/zicola/genomes/silva_rRNA_maize/smr_database"
-
-i=$(sed -n ${SLURM_ARRAY_TASK_ID}p trimmed_reads/list.txt)
-
-sortmerna -a 1 --paired_in --fastx \
-    --ref ${PATH_DB}/smr_v4.3_default_db.fasta,${PATH_DB}/smr_v4.3_default_db.idx \
-    --reads trimmed_reads/merged_fastq/${i}.merged.fq \
-    --aligned rRNA_removed/${i}.aligned \
-    --other rRNA_removed/${i}.mRNA
-
-```
-
-```{bash, eval=FALSE}
-
-srun --pty -p medium --mem=4G --cpus-per-task=10 --time=01:00:00  bash
-
-i="02_Pm"
-
-module purge
-
-module load rev/21.12 sortmerna/20170809
-
-PATH_DB="/usr/users/zicola/genomes/silva_rRNA_maize/smr_database"
-
-sortmerna -a 10 --paired_in --fastx \
-    --ref ${PATH_DB}/smr_v4.3_default_db.fasta,${PATH_DB}/smr_v4.3_default_db.idx \
-    --reads trimmed_reads/merged_fastq/${i}.merged.fq \
-    --aligned rRNA_removed/${i}.aligned \
-    --other rRNA_removed/${i}.mRNA
-
-```
-
-
-
-
-## Trinity (v2.15.1) with apptainer
+Use apptainer, the easiest solution to deal with all Trinity dependencies.
 
 ```{bash, eval=FALSE}
 #!/bin/bash
@@ -346,80 +186,1260 @@ module load apptainer
 PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
 
 apptainer exec --bind $PATH_DIR -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
+          --max_memory 100G \
+          --CPU $SLURM_CPUS_PER_TASK \
           --seqType fq \
           --SS_lib_type RF \
           --left ${PATH_DIR}/$INPUT_FASTQ_LEFT  \
           --right ${PATH_DIR}/$INPUT_FASTQ_RIGHT \
-          --max_memory 100G --CPU $SLURM_CPUS_PER_TASK \
           --output ${PATH_DIR}/$OUTPUT_DIR
 
 ```
 
-
-```{r}
-# Ad
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ad/trinity_out_dir trinity_run.sh
-```
-
-First run finished. It took 9 hours (08:58:28)
-
-```{bash, eval=FALSE}
-seqkit stats trinity_out_dir.Trinity.fasta
-file                           format  type  num_seqs      sum_len  min_len  avg_len  max_len
-trinity_out_dir.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
-
-# Number of genes
-cut -f1 trinity_out_dir.Trinity.fasta.gene_trans_map | uniq | wc -l
-67047
-
-# Rename fasta
-mv trinity_out_dir.Trinity.fasta Ad_trinity.Trinity.fasta
-mv trinity_out_dir.Trinity.fasta.gene_trans_map Ad_trinity.Trinity.fasta.gene_trans_map
-
-```
-
-
-
-
-```{r}
-# Pm
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Pm_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Pm_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Pm/Pm_trinity trinity_run.sh
-```
-
-
+Loop of over each sample:
 
 ```{bash, eval=FALSE}
 
+while read i; do
+  echo "sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh"
+  sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh
+done < list
 
-# Pm
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Pm trinity_run.sh
+```
 
-# Zt
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Zt trinity_run.sh
 
-# Asp
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Asp trinity_run.sh
+```{bash, eval=FALSE}
+while read i; do seqkit stats $i; done <<<$(f *trinity.Trinity.fasta )
+file                                 format  type  num_seqs      sum_len  min_len  avg_len  max_len
+./02_Pm/02_Pm_trinity.Trinity.fasta  FASTA   DNA    140,145  116,247,368      177    829.5   26,406
+file                               format  type  num_seqs      sum_len  min_len  avg_len  max_len
+./05_G/05_G_trinity.Trinity.fasta  FASTA   DNA    104,390  100,387,029      177    961.7   25,018
+file                                 format  type  num_seqs     sum_len  min_len  avg_len  max_len
+./03_Zt/03_Zt_trinity.Trinity.fasta  FASTA   DNA     76,934  86,902,887      182  1,129.6   26,778
+file                                   format  type  num_seqs     sum_len  min_len  avg_len  max_len
+./04_Asp/04_Asp_trinity.Trinity.fasta  FASTA   DNA     72,481  82,598,703      174  1,139.6   24,631
+file                                 format  type  num_seqs      sum_len  min_len  avg_len  max_len
+./01_Ad/01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
 
-# G
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/G trinity_run.sh
+```
 
-# Ol
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ol trinity_run.sh
 
-# Pr
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Pr trinity_run.sh
 
-# Ar
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/01_Ad_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/01_Ad_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/Ar trinity_run.sh
+## 01_Ad
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 4909774
+JobName: Trinity
+Submitted: 2025-01-09T11:00:42
+Started: 2025-01-09T11:01:32
+Ended: 2025-01-09T20:00:00
+Elapsed: 539 min, Limit: 2880 min, Difference: 2341 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 143.73 core-hours
+=======================================================
+```
+
+
+## 02_Pm
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037510
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:30:58
+Ended: 2025-01-16T05:29:00
+Elapsed: 659 min, Limit: 720 min, Difference: 61 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 175.73 core-hours
+=======================================================
+
+```
+
+## 03_Zt
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037511
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:33:29
+Ended: 2025-01-16T02:21:09
+Elapsed: 468 min, Limit: 720 min, Difference: 252 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 124.80 core-hours
+=======================================================
+```
+
+
+## 04_Asp
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037512
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:43:26
+Ended: 2025-01-16T01:05:36
+Elapsed: 383 min, Limit: 720 min, Difference: 337 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 102.13 core-hours
+=======================================================
+
+```
+
+
+## 05_G
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037513
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T01:05:50
+Ended: 2025-01-16T09:00:03
+Elapsed: 475 min, Limit: 720 min, Difference: 245 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 126.67 core-hours
+=======================================================
+```
+
+
+## 06_Ol
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037514
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T09:00:47
+Ended: 2025-01-16T16:55:44
+Elapsed: 475 min, Limit: 720 min, Difference: 245 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 126.67 core-hours
+=======================================================
+```
+
+## 07_Pr
+
+```{bash, eval=FALSE}
+
+============ Job Information ==========================
+JobID: 5037515
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T09:51:54
+Ended: 2025-01-16T17:41:27
+Elapsed: 470 min, Limit: 720 min, Difference: 250 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 125.33 core-hours
+=======================================================
+```
+
+
+## 08_Ar
+
+Time out
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037516
+JobName: Trinity
+Submitted: 2025-01-15T18:04:05
+Started: 2025-01-16T09:51:54
+Ended: 2025-01-16T21:52:17
+Elapsed: 721 min, Limit: 720 min, Difference: -1 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 192.27 core-hours
+=======================================================
+```
+
+Based on the forum, I can rerun Trinity command and it will start from the last completed checkpoint
+
+
+```{bash, eval=FALSE}
+i="08_Ar"
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh
+```
+
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5056408
+JobName: Trinity
+Submitted: 2025-01-17T08:47:18
+Started: 2025-01-17T08:47:24
+Ended: 2025-01-17T11:05:41
+Elapsed: 139 min, Limit: 720 min, Difference: 581 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 37.07 core-hours
+=======================================================
+```
+
+Finished in 139 min for the remaining steps.
+
+
+# Summary assemblies
+
+```{bash, eval=FALSE}
+
+f *_trinity.Trinity.fasta -exec seqkit stats {} \; | grep -v "file"
+./02_Pm/02_Pm_trinity.Trinity.fasta  FASTA   DNA    140,145  116,247,368      177    829.5   26,406
+./05_G/05_G_trinity.Trinity.fasta  FASTA   DNA    104,390  100,387,029      177    961.7   25,018
+./03_Zt/03_Zt_trinity.Trinity.fasta  FASTA   DNA     76,934  86,902,887      182  1,129.6   26,778
+./04_Asp/04_Asp_trinity.Trinity.fasta  FASTA   DNA     72,481  82,598,703      174  1,139.6   24,631
+./06_Ol/06_Ol_trinity.Trinity.fasta  FASTA   DNA    100,481  96,388,352      178    959.3   20,450
+./08_Ar/08_Ar_trinity.Trinity.fasta  FASTA   DNA    249,888  141,043,361      188    564.4   35,915
+./07_Pr/07_Pr_trinity.Trinity.fasta  FASTA   DNA     92,572  108,290,220      180  1,169.8   24,578
+./01_Ad/01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
 
 
 ```
 
 
+# Quality check TrinityStats
+
+```{bash, eval=FALSE}
+
+path_output="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output"
+
+module load apptainer
+
+apptainer exec --bind $path_output -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg /usr/local/bin/util/TrinityStats.pl 01_Ad/01_Ad_trinity.Trinity.fasta
+
+```
+
+
+## 01_Ad
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  67047
+Total trinity transcripts:   103137
+Percent GC: 36.52
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6347
+   Contig N20: 4615
+   Contig N30: 3602
+   Contig N40: 2835
+   Contig N50: 2225
+
+   Median contig length: 460
+   Average contig: 1071.33
+   Total assembled bases: 110493798
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5485
+   Contig N20: 3842
+   Contig N30: 2821
+   Contig N40: 2091
+   Contig N50: 1507
+
+   Median contig length: 348
+   Average contig: 751.81
+   Total assembled bases: 50406345
+
+```
+
+
+## 02_Pm
+
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  94235
+Total trinity transcripts:   140145
+Percent GC: 36.70
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5401
+   Contig N20: 3962
+   Contig N30: 2946
+   Contig N40: 2241
+   Contig N50: 1687
+
+   Median contig length: 372
+   Average contig: 829.48
+   Total assembled bases: 116247368
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4755
+   Contig N20: 3178
+   Contig N30: 2225
+   Contig N40: 1580
+   Contig N50: 1027
+
+   Median contig length: 318
+   Average contig: 620.79
+   Total assembled bases: 58500213
+
+```
+
+## 03_Zt
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  51952
+Total trinity transcripts:   76934
+Percent GC: 36.81
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6342
+   Contig N20: 4654
+   Contig N30: 3615
+   Contig N40: 2885
+   Contig N50: 2285
+
+   Median contig length: 505
+   Average contig: 1129.58
+   Total assembled bases: 86902887
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5679
+   Contig N20: 3983
+   Contig N30: 3002
+   Contig N40: 2313
+   Contig N50: 1753
+
+   Median contig length: 377
+   Average contig: 837.57
+   Total assembled bases: 43513583
+
+```
+
+## 04_Asp
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  45431
+Total trinity transcripts:   72481
+Percent GC: 37.03
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6191
+   Contig N20: 4539
+   Contig N30: 3567
+   Contig N40: 2817
+   Contig N50: 2233
+
+   Median contig length: 533
+   Average contig: 1139.59
+   Total assembled bases: 82598703
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5577
+   Contig N20: 3920
+   Contig N30: 2963
+   Contig N40: 2276
+   Contig N50: 1750
+
+   Median contig length: 390
+   Average contig: 862.61
+   Total assembled bases: 39189450
+
+```
+
+## 05_G
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  63019
+Total trinity transcripts:   104390
+Percent GC: 36.59
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5600
+   Contig N20: 3984
+   Contig N30: 3006
+   Contig N40: 2372
+   Contig N50: 1843
+
+   Median contig length: 453
+   Average contig: 961.65
+   Total assembled bases: 100387029
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4898
+   Contig N20: 3317
+   Contig N30: 2445
+   Contig N40: 1830
+   Contig N50: 1357
+
+   Median contig length: 352
+   Average contig: 728.03
+   Total assembled bases: 45879553
+
+```
+
+## 06_Ol
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  64282
+Total trinity transcripts:   100481
+Percent GC: 35.70
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5486
+   Contig N20: 3965
+   Contig N30: 3028
+   Contig N40: 2375
+   Contig N50: 1866
+
+   Median contig length: 447
+   Average contig: 959.27
+   Total assembled bases: 96388352
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4825
+   Contig N20: 3342
+   Contig N30: 2471
+   Contig N40: 1872
+   Contig N50: 1369
+
+   Median contig length: 357
+   Average contig: 731.99
+   Total assembled bases: 47053619
+
+```
+
+## 07_Pr
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  56798
+Total trinity transcripts:   92572
+Percent GC: 37.40
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6481
+   Contig N20: 4676
+   Contig N30: 3736
+   Contig N40: 2960
+   Contig N50: 2341
+
+   Median contig length: 538
+   Average contig: 1169.79
+   Total assembled bases: 108290220
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5761
+   Contig N20: 4107
+   Contig N30: 3008
+   Contig N40: 2283
+   Contig N50: 1693
+
+   Median contig length: 376
+   Average contig: 829.30
+   Total assembled bases: 47102779
+
+
+```
+
+## 08_Ar
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  202721
+Total trinity transcripts:   249888
+Percent GC: 27.13
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 3219
+   Contig N20: 2170
+   Contig N30: 1504
+   Contig N40: 986
+   Contig N50: 680
+
+   Median contig length: 350
+   Average contig: 564.43
+   Total assembled bases: 141043361
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 2421
+   Contig N20: 1436
+   Contig N30: 897
+   Contig N40: 645
+   Contig N50: 507
+
+   Median contig length: 334
+   Average contig: 478.33
+   Total assembled bases: 96967451
+
+
+```
+
+# Contamination removal
+
+## NCBI FCS GX
+
+Get for each species the taxonomy id on https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi
+
++ Anchomenus dorsalis (NCBI taxonomy ID 586010)
++ Pterostichus melanarius (NCBI taxonomy ID 60768)
++ Zabrus tenebrioides (NCBI taxonomy ID 272042)
++ Amara similata (=Harpalus similatus) (NCBI taxonomy ID 272013)
++ Harpalus affinis (NCBI taxonomy ID 247283)
++ Harpalus eous (NCBI taxonomy ID 2107211)
++ Poecilus cupreus (=Pterostichus cupreus) (NCBI taxonomy ID 270614)
++ Aphidius rhopalosiphi (NCBI taxonomy ID 55891)
+
+Then use the NCBI FCS GX tool to detect contaminations (https://usegalaxy.org/)
+
+Rename the two output files with the name of the libaries.
+
+```{bash, eval=FALSE}
+
+for i in *Action_report.tabular; do
+  sample=$(echo "$i" | cut -d_ -f1-2)
+  echo "grep "^TRINITY_" $i | cut -f1 | sort | uniq > ${sample}_list_contamination.txt"
+  grep "^TRINITY_" $i | cut -f1 | sort | uniq > ${sample}_list_contamination.txt
+done
+
+ wc -l *list_contamination.txt
+  3452 01_Ad_list_contamination.txt
+  2053 02_Pm_list_contamination.txt
+   356 03_Zt_list_contamination.txt
+    57 04_Asp_list_contamination.txt
+   397 05_G_list_contamination.txt
+   667 06_Ol_list_contamination.txt
+   200 07_Pr_list_contamination.txt
+  1133 08_Ar_list_contamination.txt
+  8315 total
+```
+
+
+### Fungal presence
+
+```{bash, eval=FALSE}
+
+for i in *_Taxonomy_report.tabular; do 
+  echo -e "\n======$i"
+  awk '$9=="fung:fungi" {print $0}' $i | \
+  cut -f6,7 | sort | uniq -c | sort | sed 's/^\s*//' | \
+  awk '{print $2,$3,$1}'  | sort -k3nr | head
+done
+
+======01_Ad_Taxonomy_report.tabular
+Mucor circinelloides 454
+Mucor velutinosus 414
+Mucor lusitanicus 410
+Mucor irregularis 267
+Mucor racemosus 118
+Pilaira anomala 100
+Mucor plumbeus 90
+Thamnidium elegans 80
+Mucor piriformis 69
+Mucor mucedo 66
+
+======02_Pm_Taxonomy_report.tabular
+Mucor indicus 225
+Mucor circinelloides 82
+Gigaspora margarita 79
+Mucor racemosus 68
+Mucor lusitanicus 65
+Mucor velutinosus 62
+Choanephora cucurbitarum 56
+Mucor irregularis 56
+Massospora cicadina 54
+Gilbertella persicaria 53
+
+======03_Zt_Taxonomy_report.tabular
+Massospora cicadina 32
+Gigaspora margarita 25
+Entomophthora muscae 21
+Gigaspora rosea 21
+Mucor irregularis 16
+Diversispora epigaea 15
+Rhizophagus clarus 12
+Mucor lusitanicus 11
+Mucor mucedo 11
+Mucor racemosus 7
+
+======04_Asp_Taxonomy_report.tabular
+Massospora cicadina 32
+Gigaspora margarita 31
+Gigaspora rosea 28
+Diversispora epigaea 17
+Entomophthora muscae 15
+Mucor circinelloides 7
+Thamnidium elegans 7
+Mucor irregularis 6
+Geosiphon pyriformis 5
+Mucor lusitanicus 5
+
+======05_G_Taxonomy_report.tabular
+Gigaspora margarita 45
+Massospora cicadina 41
+Gigaspora rosea 30
+Entomophthora muscae 23
+Diversispora epigaea 22
+Rhizophagus clarus 12
+Geosiphon pyriformis 9
+Mucor irregularis 9
+Rhizophagus irregularis 8
+Cunninghamella bertholletiae 6
+
+======06_Ol_Taxonomy_report.tabular
+Mucor irregularis 60
+Gigaspora margarita 40
+Massospora cicadina 36
+Gigaspora rosea 33
+Entomophthora muscae 28
+Mucor racemosus 28
+Mucor circinelloides 25
+Mucor mucedo 22
+Mucor lusitanicus 21
+Thamnidium elegans 20
+
+======07_Pr_Taxonomy_report.tabular
+Gigaspora margarita 41
+Massospora cicadina 38
+Entomophthora muscae 19
+Rhizophagus clarus 18
+Gigaspora rosea 17
+Diversispora epigaea 15
+Mucor piriformis 9
+Linnemannia elongata 7
+Podila humilis 6
+Rhizophagus irregularis 6
+
+======08_Ar_Taxonomy_report.tabular
+Neoconidiobolus thromboides 35
+Massospora cicadina 17
+Gigaspora margarita 14
+Gigaspora rosea 10
+Entomophthora muscae 8
+Cunninghamella blakesleeana 5
+Rhizophagus irregularis 5
+Backusella circina 4
+Diversispora epigaea 4
+Halteromyces radiatus 4
+
+```
+
+
+
+## NCBI FCS adaptor
+
+Download Galaxy file and replace spaces by underscore and remove colons.
+
++ In Galaxy, select the output files Adaptor report => Build Dataset List
++ Download the list of files
++ Note which dataset number matches to which annotation
+
+The software use this list of sequence: https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec
+
+```{bash, eval=FALSE}
+
+unzip '67_ Adaptor_reports.zip'
+
+# Replace spaces by underscore
+find . -depth -name '*' | while IFS= read -r f ; do mv -i "$f" "$(dirname "$f")/$(basename "$f"|tr ':' )" ; done
+
+# Remove colons
+find . -name "*:*" -exec rename ':' '' {} \;
+
+# Remove prefix NCBI_FCS_Adaptor_on_data_
+
+ rename 'NCBI_FCS_Adaptor_on_data_' '' *tabular
+
+
+# Rename each file manually to replace Dataset number by library names
+
+
+# Check number of transcri
+for i in *tabular; do echo $i; grep -v -n "^#accession" $i | wc -l; done
+NCBI_FCS_Adaptor_on_data_01_Ad_Adaptor_report.tabular
+0
+NCBI_FCS_Adaptor_on_data_02_Pm_Adaptor_report.tabular
+3
+NCBI_FCS_Adaptor_on_data_03_Zt_Adaptor_report.tabular
+2
+NCBI_FCS_Adaptor_on_data_04_Asp_Adaptor_report.tabular
+0
+NCBI_FCS_Adaptor_on_data_05_G_Adaptor_report.tabular
+4
+NCBI_FCS_Adaptor_on_data_06_Ol_Adaptor_report.tabular
+1
+NCBI_FCS_Adaptor_on_data_07_Pr_Adaptor_report.tabular
+0
+NCBI_FCS_Adaptor_on_data_08_Ar_Adaptor_report.tabular
+9
+
+# Check most abundant adapter type
+cat *.tabular | cut -f5 | sort | uniq -c | sed 's/^\s*//' | awk '{print $2,$1}'  | sort -k2nr | grep -v "^name"
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01114.1:Illumina 12
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00201.1:NotI 2
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00749.1:Illumina 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00754.1:Illumina 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00846.1:NEBNext 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00972.1:Pacific 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01094.1:Rubicon 1
+
+```
+
+14 transcripts with Illumina adaptors.
+
+Keep only transcript ID:
+
+```{bash, eval=FALSE}
+for i in *tabular; do 
+  grep -v "^#" $i | cut -f1 > ${i%.*}.clean.tabular
+done
+```
+
+
+## Remove contaminated transcripts
+
+Combine contaminated transcripts with adaptors and other species and cleanup fasta and map files
+
+```{bash, eval=FALSE}
+
+while read i; do
+cat fcs_adaptor_reports/${i}_Adaptor_report.clean.tabular \
+  fcs_gx_reports/${i}_list_contamination.txt | sort | uniq > ${i}_contaminants.txt
+done < list.txt
+
+wc -l *_contaminants.txt
+  3452 01_Ad_contaminants.txt
+  2056 02_Pm_contaminants.txt
+   358 03_Zt_contaminants.txt
+    57 04_Asp_contaminants.txt
+   401 05_G_contaminants.txt
+   667 06_Ol_contaminants.txt
+   200 07_Pr_contaminants.txt
+  1142 08_Ar_contaminants.txt
+
+```
+
+```{bash, eval=FALSE}
+
+while read i; do
+  seqkit grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt \
+  trinity_output/${i}/${i}_trinity.Trinity.fasta > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta
+done < list.txt
+
+[INFO] 3452 patterns loaded from file
+[INFO] 2056 patterns loaded from file
+[INFO] 358 patterns loaded from file
+[INFO] 57 patterns loaded from file
+[INFO] 401 patterns loaded from file
+[INFO] 667 patterns loaded from file
+[INFO] 200 patterns loaded from file
+[INFO] 1142 patterns loaded from file
+
+```
+
+Also fix the gene_trans_map
+
+```{bash, eval=FALSE}
+# Important to use -w, otherwise, partial match will remove transcripts
+# that are not in the contamination list!
+while read i; do
+  grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt trinity_output/${i}/${i}_trinity.Trinity.fasta.gene_trans_map > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta.gene_trans_map
+done < list.txt
+
+```
+
+Gather final files
+
+```{bash, eval=FALSE}
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output
+
+find . -type f -name *cleaned.fasta -exec cp {} summary/ \;
+
+find . -type f -name *cleaned.fasta.gene_trans_map -exec cp {} summary/ \;
+
+```
+
+Rename with insect species
+
+```{bash, eval=FALSE}
+
+cat library_to_species.txt
+01_Ad Anchomenus_dorsalis
+02_Pm Pterostichus_melanarius
+03_Zt Zabrus_tenebrioides
+04_Asp  Amara_similata
+05_G  Harpalus_affinis
+06_Ol Harpalus_eous
+07_Pr Poecilus_cupreus
+08_Ar Aphidius_rhopalosiphi
+
+
+while read i; do
+  library=$(echo "$i" | cut -f1)
+  species=$(echo "$i" | cut -f2)
+  echo "rename $library $species *fasta*"
+  rename $library $species *fasta*
+done < library_to_species.txt
+
+
+# Remove the .Trinity.cleaned.
+rename '.Trinity.cleaned' '' *fasta*
+
+seqkit stats *fasta
+processed files:  8 / 8 [======================================] ETA: 0s. done
+file                                   format  type  num_seqs      sum_len  min_len  avg_len  max_len
+Amara_similata_trinity.fasta           FASTA   DNA     72,424   82,575,412      174  1,140.2   24,631
+Anchomenus_dorsalis_trinity.fasta      FASTA   DNA     99,685  108,787,099      184  1,091.3   33,453
+Aphidius_rhopalosiphi_trinity.fasta    FASTA   DNA    248,746  140,588,291      188    565.2   35,915
+Harpalus_affinis_trinity.fasta         FASTA   DNA    103,989  100,209,791      177    963.7   25,018
+Harpalus_eous_trinity.fasta            FASTA   DNA     99,814   96,095,807      178    962.7   20,450
+Poecilus_cupreus_trinity.fasta         FASTA   DNA     92,372  108,133,517      180  1,170.6   24,578
+Pterostichus_melanarius_trinity.fasta  FASTA   DNA    138,089  115,188,695      177    834.2   26,406
+Zabrus_tenebrioides_trinity.fasta      FASTA   DNA     76,576   86,687,902      182  1,132.1   26,778
+
+
+```
+
+| file                                  | format | type | num_seqs | sum_len     | min_len | avg_len  | max_len |
+|---------------------------------------|--------|------|----------|-------------|---------|----------|---------|
+| Amara_similata_trinity.fasta          | FASTA  | DNA  | 72,424   | 82,575,412  | 174     | 1,140.20 | 24,631  |
+| Anchomenus_dorsalis_trinity.fasta     | FASTA  | DNA  | 99,685   | 108,787,099 | 184     | 1,091.30 | 33,453  |
+| Aphidius_rhopalosiphi_trinity.fasta   | FASTA  | DNA  | 248,746  | 140,588,291 | 188     | 565.2    | 35,915  |
+| Harpalus_affinis_trinity.fasta        | FASTA  | DNA  | 103,989  | 100,209,791 | 177     | 963.7    | 25,018  |
+| Harpalus_eous_trinity.fasta           | FASTA  | DNA  | 99,814   | 96,095,807  | 178     | 962.7    | 20,450  |
+| Poecilus_cupreus_trinity.fasta        | FASTA  | DNA  | 92,372   | 108,133,517 | 180     | 1,170.60 | 24,578  |
+| Pterostichus_melanarius_trinity.fasta | FASTA  | DNA  | 138,089  | 115,188,695 | 177     | 834.2    | 26,406  |
+| Zabrus_tenebrioides_trinity.fasta     | FASTA  | DNA  | 76,576   | 86,687,902  | 182     | 1,132.10 | 26,778  |
+
+
+
+Number of genes:
+
+```{bash, eval=FALSE}
+for i in *gene_trans_map; do echo $(echo "$i" | cut -d_ -f1,2); cut -f1 $i| sort | uniq | wc -l; done
+Amara_similata
+45382
+Anchomenus_dorsalis
+64702
+Aphidius_rhopalosiphi
+201906
+Harpalus_affinis
+62673
+Harpalus_eous
+63803
+Poecilus_cupreus
+56672
+Pterostichus_melanarius
+92836
+Zabrus_tenebrioides
+51663
+
+```
+
+| species                 | nb_genes |
+|-------------------------|----------|
+| Amara_similata          | 45,382   |
+| Anchomenus_dorsalis     | 64,702   |
+| Aphidius_rhopalosiphi   | 201,906  |
+| Harpalus_affinis        | 62,673   |
+| Harpalus_eous           | 63,803   |
+| Poecilus_cupreus        | 56,672   |
+| Pterostichus_melanarius | 92,836   |
+| Zabrus_tenebrioides     | 51,663   |
+
+
+
+## Summary contamination
+
+| library | species                 | Transcripts w/ conta | Transcripts w/o conta | diff1 | Genes w/ conta | Genes w/o conta | diff2 |
+|---------|-------------------------|----------------------|-----------------------|-------|----------------|-----------------|-------|
+| 01_Ad   | Anchomenus_dorsalis     | 103,137              | 99,685                | 3,452 | 67,047         | 64,702          | 2,345 |
+| 02_Pm   | Pterostichus_melanarius | 140,145              | 138,089               | 2,056 | 94,235         | 92,835          | 1,400 |
+| 03_Zt   | Zabrus_tenebrioides     | 76,934               | 76,576                | 358   | 51,952         | 51,663          | 289   |
+| 04_Asp  | Amara_similata          | 72,481               | 72,424                | 57    | 45,431         | 45,382          | 49    |
+| 05_G    | Harpalus_affinis        | 104,390              | 103,989               | 401   | 63,019         | 62,673          | 346   |
+| 06_Ol   | Harpalus_eous           | 100,481              | 99,814                | 667   | 64,282         | 63,803          | 479   |
+| 07_Pr   | Poecilus_cupreus        | 92,572               | 92,372                | 200   | 56,798         | 56,672          | 126   |
+| 08_Ar   | Aphidius_rhopalosiphi   | 249,888              | 248,746               | 1,142 | 202,721        | 201,906         | 815   |
+
+
+
+# Transdecoder
+
+Transdecoder needs a different output folder for each file, otherwise, it will override files of other instances.
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=TransDecoder
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:40:00
+#SBATCH --mem=20gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=TransDecoder.%J.out
+#SBATCH --error=TransDecoder.%J.err
+#SBATCH --array=1-8
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+output_folder="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output"
+trinity_folder="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary"
+
+file_name=$(sed -n ${SLURM_ARRAY_TASK_ID}p ${trinity_folder}/library_to_species.txt | cut -f2)
+mkdir ${output_folder}/${file_name}
+
+~/bin/TransDecoder-TransDecoder-v5.7.0/TransDecoder.LongOrfs \
+    --gene_trans_map ${trinity_folder}/${file_name}_trinity.fasta.gene_trans_map \
+    -t ${trinity_folder}/${file_name}_trinity.fasta \
+    --output_dir ${output_folder}/${file_name} 
+    && \
+    ~/bin/TransDecoder-TransDecoder-v5.7.0/TransDecoder.Predict \
+    -t ${trinity_folder}/${file_name}_trinity.fasta \
+    --output_dir ${output_folder}/${file_name}
+
+```
+
+
+
+
+# Trinotate
+
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=20:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=40gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module load gcc
+module load hmmer/3.3
+
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "diamond"
+test_program "cmpress"
+test_program "hmmpress"
+test_program "tmhmm"
+test_program "signalp6"
+
+
+# Variables passed to sbatch
+# NAME_SPECIES
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+# Variables
+TRINOTATE_HOME="/usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1"
+
+#NAME_SPECIES is provided as argument to sbatch
+sqlite_db="/usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1/Trinotate_${NAME_SPECIES}.sqlite"
+
+
+echo "############################"
+echo "Trinotate create"
+date
+echo "############################"
+
+$TRINOTATE_HOME/Trinotate --create \
+    --db $sqlite_db \
+    --trinotate_data_dir $TRINOTATE_HOME/TRINOTATE_DATA_DIR \
+    --use_diamond
+
+echo "###############################"
+echo "Trinotate Init"
+date
+echo "###############################"
+
+
+$TRINOTATE_HOME/Trinotate --db $sqlite_db --init \
+           --gene_trans_map $GENE_TRANS_MAP \
+           --transcript_fasta $TRINITY_FASTA \
+           --transdecoder_pep $TRANSDECODER_PEP
+
+echo "##############################"
+echo  "Trinotate Run"
+date
+echo "##############################"
+ 
+$TRINOTATE_HOME/Trinotate --db ${sqlite_db} --CPU ${SLURM_CPUS_ON_NODE} --run ALL \
+  --trinotate_data_dir $TRINOTATE_HOME/TRINOTATE_DATA_DIR \
+    --transcript_fasta $TRINITY_FASTA \
+      --transdecoder_pep $TRANSDECODER_PEP \
+      --use_diamond
+
+echo "###########################"
+echo "Generating report table"
+date
+echo "###########################"
+
+$TRINOTATE_HOME/Trinotate --db ${sqlite_db} \
+  --report --incl_pep --incl_trans > Trinotate_report.tsv
+
+##################
+## Misc value adds
+##################
+
+# Extract GO terms
+${TRINOTATE_HOME}/util/extract_GO_assignments_from_Trinotate_xls.pl \
+  --Trinotate_xls Trinotate_report.tsv -G -I > Trinotate_report.tsv.gene_ontology
+
+# Generate trinotate report summary statistics
+${TRINOTATE_HOME}/util/report_summary/trinotate_report_summary.pl \
+  Trinotate_report.tsv Trinotate_report_stats
+
+echo "##########################"
+echo "done.  See annotation summary file:  Trinotate_report.tsv"
+date
+echo "##########################"
+
+
+
+```
+
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=00:10:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=10gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module load gcc
+module load hmmer/3.3
+
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "diamond"
+test_program "cmpress"
+test_program "hmmpress"
+test_program "tmhmm"
+test_program "signalp6"
+
+
+# Variables passed to sbatch
+# NAME_SPECIES
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+# Variables
+TRINOTATE_HOME="/usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1"
+
+#NAME_SPECIES is provided as argument to sbatch
+sqlite_db="/usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1/Trinotate_${NAME_SPECIES}.sqlite"
+
+
+echo "############################"
+echo "Trinotate create"
+date
+echo "############################"
+
+$TRINOTATE_HOME/Trinotate --create \
+    --db $sqlite_db \
+    --trinotate_data_dir $TRINOTATE_HOME/TRINOTATE_DATA_DIR \
+    --use_diamond
+
+echo "###############################"
+echo "Trinotate Init"
+date
+echo "###############################"
+
+
+$TRINOTATE_HOME/Trinotate --db $sqlite_db --init \
+           --gene_trans_map $GENE_TRANS_MAP \
+           --transcript_fasta $TRINITY_FASTA \
+           --transdecoder_pep $TRANSDECODER_PEP
+
+echo "##############################"
+echo  "Trinotate Run"
+date
+echo "##############################"
+ 
+$TRINOTATE_HOME/Trinotate --db ${sqlite_db} --CPU ${SLURM_CPUS_ON_NODE} --run ALL \
+  --trinotate_data_dir $TRINOTATE_HOME/TRINOTATE_DATA_DIR \
+    --transcript_fasta $TRINITY_FASTA \
+      --transdecoder_pep $TRANSDECODER_PEP \
+      --use_diamond
+
+echo "###########################"
+echo "Generating report table"
+date
+echo "###########################"
+
+$TRINOTATE_HOME/Trinotate --db ${sqlite_db} \
+  --report --incl_pep --incl_trans > Trinotate_report.tsv
+
+##################
+## Misc value adds
+##################
+
+# Extract GO terms
+${TRINOTATE_HOME}/util/extract_GO_assignments_from_Trinotate_xls.pl \
+  --Trinotate_xls Trinotate_report.tsv -G -I > Trinotate_report.tsv.gene_ontology
+
+# Generate trinotate report summary statistics
+${TRINOTATE_HOME}/util/report_summary/trinotate_report_summary.pl \
+  Trinotate_report.tsv Trinotate_report_stats
+
+echo "##########################"
+echo "done.  See annotation summary file:  Trinotate_report.tsv"
+date
+echo "##########################"
+```
+
+
+```{bash, eval=FALSE}
+
+
+# Variables passed to sbatch
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+sbatch  --export=NAME_SPECIES=dd,GENE_TRANS_MAP=ddd,TRINITY_FASTA=d,TRANSDECODER_PEP=dd 04_trinotate.sh
+
+work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+# Amara_similata
+
+sbatch --export=NAME_SPECIES=Amara_similata,GENE_TRANS_MAP=${work_path}/trinity_output/summary/Amara_similata_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/Amara_similata_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep 04_trinotate.sh
+
+
+while read i; do
+
+mkdir $i
+  cd $i 
+  sbatch --export=NAME_SPECIES=Amara_similata,GENE_TRANS_MAP=${work_path}/trinity_output/summary/Amara_similata_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/Amara_similata_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep ../04_trinotate.sh
+  cd ..
+done < list_species.txt
+
+```
 
 
 
 # Off-target analysis
+
+This job will be done by the partner company Eupheria Biotech GmbH (https://www.fisaonline.de/einrichtungen-finden/details/?tx_fisaresearch_institutions%5Baction%5D=institutionDetails&tx_fisaresearch_institutions%5Bcontroller%5D=Institutions&tx_fisaresearch_institutions%5Bi_id%5D=5804&cHash=f826a8e38b4decbcd499614c8e5f051e#more)
+
+
 
 Use Doga's script (https://figshare.com/articles/dataset/_i_in_silico_i_off-target_analysis_of_lethal_genes_in_cabbage_stem_flea_beetle/25283683?file=44671225) (scripts/off_target_prediction_lethal.py)
 
@@ -428,28 +1448,38 @@ Use Doga's script (https://figshare.com/articles/dataset/_i_in_silico_i_off-targ
 
 Di mentioned that to verify if we have the correct species, one needs to look at the cytochrome oxidase subunit 1 (COI) sequence.
 
-Anchomenus dorsalis
+01_Ad
+Anchomenus dorsalis (NCBI taxonomy ID 586010)
 https://www.ncbi.nlm.nih.gov/nuccore/HQ953549.1
 
-Pterostichus melanarius
+https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=586010
+
+02_Pt
+Pterostichus melanarius (NCBI taxonomy ID 60768)
 https://www.ncbi.nlm.nih.gov/nuccore/MH020387.1
 
-Zabrus tenebrioides
+03_Zt
+Zabrus tenebrioides (NCBI taxonomy ID 272042)
 https://www.ncbi.nlm.nih.gov/nuccore/ON623806.2
 
-Amara similata
+04_Asp
+Amara similata (=Harpalus similatus) (NCBI taxonomy ID 272013)
 https://www.ncbi.nlm.nih.gov/nuccore/MH020396.1
 
-Harpalus affinis
+05_G
+Harpalus affinis (NCBI taxonomy ID 247283)
 https://www.ncbi.nlm.nih.gov/nuccore/OK638137.1
 
-Harpalus eous
+06_Ol
+Harpalus eous (NCBI taxonomy ID 2107211)
 https://www.ncbi.nlm.nih.gov/nuccore/LC764887.1
 
-Poecilus cupreus
+07_Pr
+Poecilus cupreus (=Pterostichus cupreus) (NCBI taxonomy ID 270614)
 https://www.ncbi.nlm.nih.gov/nuccore/MN454673.1
 
-Aphidius rhopalosiphi
+08_Ar
+Aphidius rhopalosiphi (NCBI taxonomy ID 55891)
 https://www.ncbi.nlm.nih.gov/nuccore/JN164779.1
 
 
