@@ -603,7 +603,41 @@ sortmerna -a 1 --paired_in --fastx \
     --aligned aligned \
     --other mRNA -v
 ```
- Works
+
+Works
+
+Redo a test to see the fraction of reads removed.
+
+
+### Test Anchomenus dorsalis 
+
+
+```{bash, eval=FALSE}
+srun --pty -p medium --mem=40G --time=04:00:00  bash
+
+module load rev/21.12 sortmerna/20170809
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trimmed_reads
+mkdir test_sortmerna
+gunzip  01_Ad_*
+
+# Get them merged (each pair is together)
+/usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh 01_Ad_L1_1.trimmed.fq 01_Ad_L1_2.trimmed.fq  test_sortmerna/01_Ad_L1.merged.fq
+
+cd test_sortmerna
+
+DB_sortmerna="/usr/users/zicola/genomes/sortmerna_database"
+
+sortmerna -a 1 --paired_in --fastx \
+    --ref ${DB_sortmerna}/smr_v4.3_default_db.fasta,${DB_sortmerna}/smr_v4.3_default_db.idx \
+    --reads 01_Ad_L1.merged.fq \
+    --aligned 01_Ad_L1_aligned \
+    --other 01_Ad_L1_mRNA -v
+
+# Reseparate strands
+
+```
+
 
 # Trinotate
 
@@ -860,6 +894,772 @@ spack -d spec zlib
 ```
 
 
+### Solution => Use apptainer
+
+
+# Test apptainer
+
+sbatch script `sbatch_apptainer.sh`. Launch from dir `/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects`
+
+```{bash, eval=FALSE}
+
+
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=00:05:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+module load apptainer
+
+# Pass to apptainer the variable NEWHOME
+export APPTAINERENV_NEWHOME=/usr/users/zicola/newhome
+export APPTAINERENV_SPECIES=$NAMESPECIES
+
+apptainer run -C -B /usr/users/npghpc/ \
+   -B /usr/users/zicola /usr/users/zicola/bin/trinotate.v4.0.2.simg /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/test_apptainer.sh
+
+```
+
+
+shell script `test_apptainer.sh`
+
+```{bash, eval=FALSE}
+
+export HOME=$NEWHOME
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+cd $HOME
+pwd > output_pwd.txt
+
+#${TRINOTATE_HOME}/Trinotate --help > help_trinotate.txt
+
+```
+
+Make the script executable `chmod +x test_apptainer.sh`
+
+```{bash, eval=FALSE}
+
+sbatch sbatch_apptainer.sh
+
+cat ~/newhome/output_pwd.txt
+/usr/users/zicola/newhome
+
+# Worked
+```
 
 
 
+
+##Simple functions
+
+
+Way to call Trinotate
+
+```{bash, eval=FALSE}
+
+module load apptainer
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate 
+
+
+# Direct run within the container
+apptainer shell --bind "/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects" ~/bin/trinotate.v4.0.2.simg
+
+cd ~
+apptainer shell ~/bin/trinotate.v4.0.2.simg
+
+```
+
+
+Add extra step for tmhmm and signal in the pipeline used for OPM
+
+
+## Create database
+
+What this step does it just copy the `TrinotateBoilerplate.sqlite` (340 Mb) file from TRINOTATE_DATA_DIR into the name and folder we specify for the our database. Include --use_diamond if you plan to use diamond blast with Trinotate, otherwise NCBI blast+ will be used for database preparation.
+
+https://github.com/Trinotate/Trinotate/wiki/Software-installation-and-data-required
+
+```{bash, eval=FALSE}
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
+
+# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
+# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
+
+export TRINOTATE_DATA_DIR=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/TRINOTATE_DATA_DIR
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
+
+while read NAME_SPECIES; do
+   mkdir $NAME_SPECIES
+   
+   apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+      --db $NAME_SPECIES/database_${NAME_SPECIES}.sqlite \
+      --create \
+      --trinotate_data_dir $TRINOTATE_DATA_DIR \
+      --use_diamond
+done < list_species.txt
+
+    
+```
+
+
+## Trinotate
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=16:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=40gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module purge
+module load apptainer
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "tmhmm"
+test_program "signalp6"
+
+# Variables passed to sbatch
+# NAME_SPECIES
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
+# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
+export TRINOTATE_DATA_DIR=${PATH_DIR}/trinotate_output/TRINOTATE_DATA_DIR
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
+sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
+
+
+echo "###############################"
+echo "Trinotate Init"
+date
+echo "###############################"
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db --init \
+   --gene_trans_map $GENE_TRANS_MAP \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP
+
+echo "##############################"
+echo  "Trinotate Run"
+date
+echo "##############################"
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --CPU ${SLURM_CPUS_ON_NODE} \
+   --db $sqlite_db \
+   --run ALL \
+   --trinotate_data_dir $TRINOTATE_DATA_DIR \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP \
+   --use_diamond
+
+echo "##############################"
+echo  "Trinotate Run signalp"
+date
+echo "##############################"
+
+signalp6 --fastafile $TRANSDECODER_PEP \
+   --output_dir ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir \
+   --format none --organism euk --mode fast
+
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_signalp ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir/output.gff3
+
+
+echo "##############################"
+echo  "Trinotate Run TMHMM"
+date
+echo "##############################"
+
+tmhmm --short $TRANSDECODER_PEP > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_tmhmmv2 ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
+
+echo "###########################"
+echo "Generating report table"
+date
+echo "###########################"
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+
+
+##################
+## Misc value adds
+date
+##################
+
+# Extract GO terms
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/extract_GO_assignments_from_Trinotate_xls.pl \
+  --Trinotate_xls Trinotate_report.tsv \
+  -G -I > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv.gene_ontology
+
+# Generate trinotate report summary statistics
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/report_summary/trinotate_report_summary.pl \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report_stats
+
+
+echo "##########################"
+echo "done.  See annotation summary file:  Trinotate_report.tsv"
+date
+echo "##########################"
+
+```
+
+Run one by one because I notice intermediate files and report are written in $HOME without running number, which will lead to potential conflicts for parallel runs.
+
+```{bash, eval=FALSE}
+
+work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+i="Amara_similata"
+cd $i
+sbatch --export=NAME_SPECIES=$i,GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep ../04_trinotate.sh
+
+```
+
+
+
+Job killed due to error
+
+```{bash, eval=FALSE}
+CMD: /usr/local/src/Trinotate/util/report_summary/../gene_ontology/Trinotate_GO_to_SLIM.pl /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats.GO > /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats.GO.slim
+CMD: /usr/local/src/Trinotate/util/report_summary/util/make_cXp_html.pl /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats > /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats.cXp_summary.html
+Can't use an undefined value as an ARRAY reference at /usr/local/src/Trinotate/util/report_summary/util/../../../TrinotateWeb/cgi-bin/PerlLib/CanvasXpress/Sunburst.pm line 77.
+Error, cmd:
+/usr/local/src/Trinotate/util/report_summary/util/make_cXp_html.pl /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats > /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/Trinotate_report_stats.cXp_summary.html
+ died with ret (65280) at /usr/local/src/Trinotate/util/report_summary/../../PerlLib/Process_cmd.pm line 19, <$fh> line 1.
+        Process_cmd::process_cmd("/usr/local/src/Trinotate/util/report_summary/util/make_cXp_ht"...) called at /usr/local/src/Trinotate/util/report_summary/trinotate_report_summary.pl line 102
+
+```
+
+
+```{bash, eval=FALSE}
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+
+```
+
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=test_pwd
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=00:00:10
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=40mb
+#SBATCH --output=trinotate.%J.out
+#SBATCH --chdir="/usr/users/zicola"
+
+pwd
+
+
+```
+
+
+
+## Problem with DB download
+
+
+## Remake full database
+
+I think I screwed up something in TRINOTATE_DATA_DIR so download everything anew.
+
+```{bash, eval=FALSE}
+module load apptainer
+
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
+
+apptainer exec --bind /scratch/users/zicola -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+      --db test.sqlite \
+      --create \
+      --trinotate_data_dir $TRINOTATE_DATA_DIR \
+      --use_diamond
+
+cd /scratch/users/zicola
+
+mkdir TRINOTATE_DATA_DIR
+
+srun --time=06:00:00 -p medium --mem=20Gb bash create_database.sh
+
+```
+
+
+Rfam files did not download sucessfully so I downloaded them manually from https://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/
+
+Kill the job at this point, then do the steps my self and relaunch
+
+```{bash, eval=FALSE}
+cd /scratch/users/zicola/trinotate
+
+wget ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz
+
+gunzip Rfam.cm.gz
+cmpress Rfam.cm
+
+Working...    done.
+Pressed and indexed 4178 CMs and p7 HMM filters (4178 names and 4178 accessions).
+Covariance models and p7 filters pressed into binary file:  Rfam.cm.i1m
+SSI index for binary covariance model file:                 Rfam.cm.i1i
+Optimized p7 filter profiles (MSV part)  pressed into:      Rfam.cm.i1f
+Optimized p7 filter profiles (remainder) pressed into:      Rfam.cm.i1p
+
+
+wget https://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.clanin
+
+mv Rfam.* /scratch/users/zicola/trinotate/TRINOTATE_DATA_DIR
+
+# Create a fake checkpoint so that it does not try to download the files again
+touch TRINOTATE_DATA_DIR/__chckpts/cmpress_Rfam_cm.ok
+
+srun --time=06:00:00 -o output2.txt -p medium --mem=20Gb bash create_database.sh
+
+```
+
+
+I also moved the EGGNOG files as they are heavy and I have alread downloaded them recently
+
+```{bash, eval=FALSE}
+cd /scratch/users/zicola/TRINOTATE_DATA_DIR
+mv /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/TRINOTATE_DATA_DIR_OLD/EGGNOG_DATA_DIR .
+```
+
+
+```{bash, eval=FALSE}
+module load apptainer
+
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
+
+apptainer exec --bind /scratch/users/zicola -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+      --db test.sqlite \
+      --create \
+      --trinotate_data_dir $TRINOTATE_DATA_DIR \
+      --use_diamond
+```
+
+```
+
+-CREATING test.sqlite and populating data dir: /scratch/users/zicola/TRINOTATE_DATA_DIR
+WARNING: SQLITE database test.sqlite already exists and wont be replaced.
+-sqlite db test.sqlite already exists and is not being replaced. If a new boilerplate is required, copy db from: /scratch/users/zicola/TRINOTATE_DATA_DIR/TrinotateBoilerplate.sqlite
+-- Skipping CMD: /usr/local/src/Trinotate/util/admin/Build_Trinotate_Boilerplate_SQLite_db.pl TrinotateBoilerplate, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/build_boilerplate.ok] exists.
+-- Skipping CMD: mv TrinotateBoilerplate.sqlite pfam2go go-basic.obo pfam2go.tab NOG.annotations.tsv.gz /scratch/users/zicola/TRINOTATE_DATA_DIR/, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/copy_boilerplate_to_datadir.ok] exists.
+-- Skipping CMD: makeblastdb -in uniprot_sprot.pep -dbtype prot, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/make_sprot_blast_db.ok] exists.
+-- Skipping CMD: diamond makedb --in uniprot_sprot.pep -d uniprot_sprot, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/make_diamond_sprot_db.ok] exists.
+-- Skipping CMD: mv uniprot_sprot* /scratch/users/zicola/TRINOTATE_DATA_DIR/, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/relocate_sprot_db.ok] exists.
+-- Skipping CMD: gunzip Pfam-A.hmm.gz, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/gunzip_pfam.ok] exists.
+-- Skipping CMD: hmmpress Pfam-A.hmm, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/hmmpress_pfam_db.ok] exists.
+-- Skipping CMD: mv Pfam-A.hmm* /scratch/users/zicola/TRINOTATE_DATA_DIR/, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/relocate_pfam_db.ok] exists.
+-- Skipping CMD: gunzip Pfam-A.hmm.gz, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/gunzip_pfam.ok] exists.
+-- Skipping CMD: hmmpress Pfam-A.hmm, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/hmmpress_pfam_db.ok] exists.
+-- Skipping CMD: mv Pfam-A.hmm* /scratch/users/zicola/TRINOTATE_DATA_DIR/, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/relocate_pfam_db.ok] exists.
+-- Skipping CMD: wget ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/wget_Rfam.cm.gz] exists.
+-- Skipping CMD: gunzip Rfam.cm.gz, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/gunzip_Rfam.cm.gz] exists.
+-- Skipping CMD: wget ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.clanin, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/wget_clanin.cm.gz] exists.
+-- Skipping CMD: cmpress Rfam.cm, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/cmpress_Rfam_cm.ok] exists.
+-- Skipping CMD: mv Rfam.* /scratch/users/zicola/TRINOTATE_DATA_DIR/, checkpoint [/scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/relocate_Rfam_db.ok] exists.
+-EGGNOG_MAPPER: installing eggnogmapper data at: /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
+* [Thu Jan 23 09:49:49 2025] Running CMD: download_eggnog_data.py --data_dir /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR -y
+Skipping eggnog.db database (already present). Use -f to force download
+Skipping eggnog.taxa.db database (already present). Use -f to force download
+Skipping diamond database (or already present). Use -f to force download
+Skipping novel families diamond database (or already present). Use -F and -f to force download
+Skipping Pfam database (or already present). Use -P and -f to force download
+Skipping MMseqs2 database (or already present). Use -M and -f to force download
+No HMMER database requested. Use "-H -d taxid" to download the hmmer database for taxid
+Finished.
+```
+
+It seems every it worked but I don't think the boiler plate included all files because of this checkpoint files.
+
+
+```{bash, eval=FALSE}
+
+module load apptainer
+
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/trinotate/TRINOTATE_DATA_DIR
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+apptainer exec --bind /scratch/users/zicola -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+      --db test.sqlite \
+      --create \
+      --trinotate_data_dir $TRINOTATE_DATA_DIR \
+      --use_diamond
+
+
+cd /scratch/users/zicola/trinotate
+
+srun --time=06:00:00 -p medium --mem=10Gb bash create_database.sh
+
+```
+
+
+## Amara_similata
+
+```{bash, eval=FALSE}
+i="Amara_similata"
+cd $i
+sbatch --export=NAME_SPECIES=$i,GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep ../04_trinotate.sh
+```
+
+
+What happens in the background (using err file from slurm)
+
+```{bash, eval=FALSE}
+
+# Load transcripts into sqlite database
+/usr/local/src/Trinotate/util/trinotateSeqLoader/TrinotateSeqLoader.pl \
+   --sqlite /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_si
+milata/database_Amara_similata.sqlite \
+   --gene_trans_map /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/Amara_similata_trinity.fasta.gen
+e_trans_map \
+   --transcript_fasta /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/Amara_similata_trinity.fasta \
+      --transdecoder_pep /usr/use
+rs/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep \
+   --bulk_load
+
+# Diamong blastp
+diamond blastp -d /scratch/users/zicola/TRINOTATE_DATA_DIR/uniprot_sprot \
+   -q /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep \
+   -p 8 -k 1 -e 1e-5 -o \
+   uniprot_sprot.diamond.blastp.outfmt6 --outfmt 6
+
+# Load blastp
+/usr/local/src/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl --sqlite /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --outfmt6 uniprot_sprot.diamond.blastp.outfmt6 \
+   --prog blastp \
+   --dbtype Swissprot
+
+# Diamong blastx
+diamond blastx -d /scratch/users/zicola/TRINOTATE_DATA_DIR/uniprot_sprot -q /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/Amara_similata_trinity.fasta \
+   -p 8 -k 1 -e 1e-5 \
+   -o uniprot_sprot.diamond.blastx.outfmt6 --outfmt 6
+
+# Load blastx
+/usr/local/src/Trinotate/util/trinotateSeqLoader/Trinotate_BLAST_loader.pl \
+--sqlite /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --outfmt6 uniprot_sprot.diamond.blastx.outfmt6 \
+   --prog blastx \
+   --dbtype Swissprot
+
+# hmmsearch (PFAM)
+hmmsearch --cpu 8 --noali --domtblout TrinotatePFAM.out /scratch/users/zicola/TRINOTATE_DATA_DIR/Pfam-A.hmm /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep > pfam.log
+
+# PFAM
+/usr/local/src/Trinotate/Trinotate --db /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --LOAD_pfam  TrinotatePFAM.out
+
+# Load PFAM result
+/usr/local/src/Trinotate/util/trinotateSeqLoader/Trinotate_PFAM_loader.pl --sqlite /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --pfam TrinotatePFAM.out
+
+# Infernal
+cmscan -Z 90 --cut_ga --rfam --nohmmonly --tblout infernal.out --fmt 2 --cpu 8 --clanin /scratch/users/zicola/TRINOTATE_DATA_DIR/Rfam.clanin /scratch/users/zicola/TRINOTATE_DATA_DIR/Rfam.cm /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/Amara_similata_trinity.fasta > infernal.log
+
+# Load
+/usr/local/src/Trinotate/Trinotate --db /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --LOAD_infernal infernal.out
+
+# emapper
+emapper.py -i /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Amara_similata_trinity.fasta.transdecoder.pep --cpu 8 --data_dir /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR -o eggnog_mapper
+
+# Load
+/usr/local/src/Trinotate/util/trinotateSeqLoader/Trinotate_EggnogMapper_loader.pl --sqlite /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Amara_similata/database_Amara_similata.sqlite --emapper eggnog_mapper.emapper.annotations
+
+```
+
+
+
+
+Still creating files in $HOME
+
+```{bash, eval=FALSE}
+zicola@gwdu101:~
+$ ls -h | grep "Jan 23"
+drwx------  5 zicola UANP         2 Jan 23  2024 R
+-rw-r-----  1 zicola UANP      120M Jan 23 13:26 TrinotatePFAM.out
+-rw-r-----  1 zicola UANP         0 Jan 23 12:50 __init.ok
+drwxr-x---  2 zicola UANP         2 Jan 23 22:00 __trinotate_run_checkpts
+-rw-r-----  1 zicola UANP       43M Jan 23 22:00 eggnog_mapper.emapper.annotations
+-rw-r-----  1 zicola UANP      9.1M Jan 23 19:54 eggnog_mapper.emapper.hits
+-rw-r-----  1 zicola UANP      2.3M Jan 23 22:00 eggnog_mapper.emapper.seed_orthologs
+-rw-r-----  1 zicola UANP      129M Jan 23 19:41 infernal.log
+-rw-r-----  1 zicola UANP       79K Jan 23 19:41 infernal.out
+-rw-r-----  1 zicola UANP      134M Jan 23 13:26 pfam.log
+-rw-r-----  1 zicola UANP      1.6M Jan 23 12:50 uniprot_sprot.diamond.blastp.outfmt6
+-rw-r-----  1 zicola UANP      1.6M Jan 23 12:50 uniprot_sprot.diamond.blastx.outfmt6
+
+```
+
+It seems the flag `--workdir ${PATH_DIR}/trinotate_output/${NAME_SPECIES}` does not help to make Trinotate generate its output in the working directory
+
+
+Check how many transcripts were annotated as rRNA:
+
+```{bash, eval=FALSE}
+grep "rRNA" infernal.out | wc -l
+111
+
+
+```
+
+
+
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=16:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=20gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module purge
+module load apptainer
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "tmhmm"
+test_program "signalp6"
+
+# Variables passed to sbatch
+# NAME_SPECIES
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
+# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
+sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
+
+
+echo "##############################"
+echo  "Trinotate Run signalp"
+date
+echo "##############################"
+
+signalp6 --fastafile $TRANSDECODER_PEP \
+   --output_dir ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir \
+   --format none --organism euk --mode fast
+
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_signalp ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir/output.gff3
+
+
+echo "##############################"
+echo  "Trinotate Run TMHMM"
+date
+echo "##############################"
+
+tmhmm --short $TRANSDECODER_PEP > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_tmhmmv2 ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
+
+echo "###########################"
+echo "Generating report table"
+date
+echo "###########################"
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+
+
+##################
+## Misc value adds
+date
+##################
+
+# Extract GO terms
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/extract_GO_assignments_from_Trinotate_xls.pl \
+  --Trinotate_xls Trinotate_report.tsv \
+  -G -I > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv.gene_ontology
+
+# Generate trinotate report summary statistics
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/report_summary/trinotate_report_summary.pl \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report_stats
+
+
+echo "##########################"
+echo "done.  See annotation summary file:  Trinotate_report.tsv"
+date
+echo "##########################"
+```
+
+
+
+# tmhmm alone
+
+
+I just need to do tmhmm as I've already done signalp for Amara similara
+
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=trinotate_tmhmm
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=06:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=5G
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate_tmhmm.%J.out
+#SBATCH --error=trinotate_tmhmm..%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module purge
+module load apptainer
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "tmhmm"
+
+# Path to trinotate executable
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+# Path to Trinity and Transdecoder files
+export WORKPATH=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+export GENE_TRANS_MAP=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta.gene_trans_map
+export TRINITY_FASTA=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta
+export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}_trinity.fasta.transdecoder.pep 
+
+# Database
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+export EGGNOG_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
+export SQLITE_DB=${WORKPATH}/trinotate_output/${SPECIES}/database_${SPECIES}.sqlite
+
+cd $WORKPATH
+
+tmhmm --short $TRANSDECODER_PEP > ${WORKPATH}/trinotate_output/${SPECIES}/tmhmm.v2.out
+
+apptainer exec --bind $WORKPATH -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $SQLITE_DB \
+   --LOAD_tmhmmv2 ${WORKPATH}/trinotate_output/${SPECIES}/tmhmm.v2.out
+   
+
+```
+
+```{bash, eval=FALSE}
+
+sbatch --export=SPECIES="Amara_similata" 05_tmhmm.sh
+
+```
+
+```{bash, eval=FALSE}
+
+sacct -j 5431422   -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
+
+sacct -j 5431422   -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
+JobID           JobName  AllocCPUS     ReqMem     MaxRSS    Elapsed
+------------ ---------- ---------- ---------- ---------- ----------
+5431422      trinotate+          1         5G              00:27:02
+5431422.bat+      batch          1                48284K   00:27:02
+5431422.ext+     extern          1                     0   00:27:02
+
+```
+
+Took only 48 Mb of RAM and 27 min
