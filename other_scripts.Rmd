@@ -5,6 +5,14 @@ date: '2025-01-16'
 output: html_document
 ---
 
+# Pipeline
+
+https://southgreenplatform.github.io/tutorials//bioanalysis/trinity/
+
+https://training.galaxyproject.org/topics/transcriptomics/tutorials/full-de-novo/tutorial.html
+
+* Trim data with cutadapt to remove adapters
+
 
 # Remove empty reads
 
@@ -609,7 +617,7 @@ Works
 Redo a test to see the fraction of reads removed.
 
 
-### Test Anchomenus dorsalis 
+## Test Anchomenus dorsalis 
 
 
 ```{bash, eval=FALSE}
@@ -634,15 +642,731 @@ sortmerna -a 1 --paired_in --fastx \
     --aligned 01_Ad_L1_aligned \
     --other 01_Ad_L1_mRNA -v
 
+# Many messages showing that read length is smaller than 18 nt
+# WARNING: At least one of the reads is shorter than 18 nucleotides, by default it will not be searched
+
 # Reseparate strands
 
 ```
+
+Already running for 3 hours and still not done. Job was killed because overtiming the 4 hours!
+
+
+I think it is slowed down by the presence of reads smaller than 18 bp. Remove these and try again
+
+
+```{bash, eval=FALSE}
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trimmed_reads
+
+module load cutadapt/4.4
+
+srun -p medium --time=00:40:00 --mem=20G --cpus-per-task=5 cutadapt --cores 5 --quality-base 33 --max-n 0 --minimum-length 25 -o test_sortmerna/01_Ad_L1_1.trimmed.min25.fq -p test_sortmerna/01_Ad_L1_2.trimmed.min25.fq 01_Ad_L1_1.trimmed.fq 01_Ad_L1_2.trimmed.fq
+
+
+Processing paired-end reads on 5 cores ...
+Finished in 601.723 s (9.464 µs/read; 6.34 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:         63,577,851
+
+== Read fate breakdown ==
+Pairs that were too short:                 267 (0.0%)
+Pairs with too many N:                       0 (0.0%)
+Pairs written (passing filters):    63,577,584 (100.0%)
+
+Total basepairs processed: 12,682,916,871 bp
+  Read 1: 6,342,339,512 bp
+  Read 2: 6,340,577,359 bp
+Total written (filtered):  12,682,907,729 bp (100.0%)
+  Read 1: 6,342,334,981 bp
+  Read 2: 6,340,572,748 bp
+
+
+srun -p medium --time=00:60:00 --mem=40G /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/merge-paired-reads.sh 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq  01_Ad_L1.merged.fq
+
+```
+
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+#SBATCH --job-name=rRNA_removal
+#SBATCH --time=10:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=40gb
+#SBATCH --partition=medium
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=rRNA_removal.%J.out
+#SBATCH --error=rRNA_removal.%J.err
+
+module load rev/21.12 sortmerna/20170809
+
+DB_sortmerna="/usr/users/zicola/genomes/sortmerna_database"
+
+sortmerna -a 1 --paired_in --fastx \
+    --ref ${DB_sortmerna}/smr_v4.3_default_db.fasta,${DB_sortmerna}/smr_v4.3_default_db.idx \
+    --reads 01_Ad_L1.merged.fq \
+    --aligned 01_Ad_L1_aligned \
+    --other 01_Ad_L1_mRNA -v
+
+```
+
+
+```{bash, eval=FALSE}
+sbatch run_sortmerna.sh
+```
+
+Done after 08:26 hours and used 38.31 Gb of RAM so I was very close to the limit set. The input fastq was 32 Gb in size
+
+```{bash, eval=FALSE}
+conda activate py3.7
+
+srun -p medium --time=00:20:00 --mem=10G seqkit stats 01_Ad_L1_mRNA.fq 01_Ad_L1_aligned.fq
+
+processed files:  2 / 2 [] ETA: 0s. done
+file                 format  type     num_seqs         sum_len  min_len  avg_len  max_len
+01_Ad_L1_mRNA.fq     FASTQ   DNA   120,612,416  12,029,946,265       25     99.7      100
+01_Ad_L1_aligned.fq  FASTQ   DNA     6,542,752     652,961,464       35     99.8      100
+
+
+```
+
+6542752/127155168
+[1] 0.05145486
+
+> 120612416/2
+[1] 60306208
+
+60306208 pairs remain after filtering
+
+With sortmerna, I get about 5% of the reads that map rRNA while I found only 0.0088% using the bowtie approach.
+
+Unmerge reads
+
+```{bash, eval=FALSE}
+
+module load rev/21.12 sortmerna/20170809
+
+srun -p medium --time=00:40:00 --mem=40G --output=unmerge.log bash /usr/product/bioinfo/SL_7.0/BIOINFORMATICS/SORTMERNA/sortmerna_20170809/scripts/unmerge-paired-reads.sh 01_Ad_L1_mRNA.fq 01_Ad_L1_mRNA.R1.fq 01_Ad_L1_mRNA.R2.fq &
+
+```
+
+16 minutes needed.
+
+
+
+
+## Ribodetector
+
+sortmerna is very long, try the newly developped ribodetector (https://github.com/hzi-bifo/RiboDetector)
+
+Paper: https://academic.oup.com/nar/article/50/10/e60/6533611
+
+
+> To demonstrate that rRNA removal is the most time-consuming step in processing with the most widely used method (SortMeRNA), we ran the entire data processing workflow on the oral metatranscriptome dataset that was used in the previous benchmark with 40 CPU cores. We performed read quality control with Fastp (46), then removed rRNA reads with SortMeRNA, filtered out human reads by mapping the non-rRNA reads against the human reference with BWA, and finally mapped the cleaned reads against HOMD reference CDSs with BWA. The read quality control required 1 min, rRNA removal with SortMeRNA took 109 min, human reads removal took 4 min, and read alignment took 2 min of computing time. In comparison, with RiboDetector, rRNA removal required only 4 min in GPU mode and 15 min in CPU mode.
+
+It uses GPU (see GWDG ressource https://docs.hpc.gwdg.de/how_to_use/compute_partitions/gpu_partitions/index.html)
+
+
+```{bash, eval=FALSE}
+# Check gpus available
+sinfo -o "%25N  %5c  %10m  %32f  %10G %18P " | grep gpu | grep scc
+
+```
+
+
+```{bash, eval=FALSE}
+
+
+module load rev/23.12 miniconda3/22.11.1
+
+conda create -n ribodetector python=3.8
+conda activate ribodetector
+
+# conda install -c bioconda ribodetector
+# Doesn't work
+
+pip install ribodetector
+# Worked
+
+ribodetector --version
+ribodetector 0.3.1
+
+# Doc recommends 20 Gb of RAM for PE data and 20 threads
+
+```
+
+
+### CPU version
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector_cpu
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=06:00:00
+#SBATCH --cpus-per-task=20
+#SBATCH --threads-per-core=1
+#SBATCH --mem=40gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=job-%x-%j.out
+#SBATCH --error=job-%x-%j.err
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+ribodetector_cpu -t 20 \
+  -l 100 \
+  -i 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq \
+  -e rrna \
+  --chunk_size 256 \
+  -o reads.nonrrna.1.fq reads.nonrrna.2.fq
+
+```
+
+```{bash, eval=FALSE}
+2025-01-30 15:54:46 : INFO  Processed 63577584 sequences in total
+2025-01-30 15:54:46 : INFO  Detected 62903350 non-rRNA sequences
+2025-01-30 15:54:46 : INFO  Detected 674234 rRNA sequences
+
+```
+
+```{bash, eval=FALSE}
+sa 5518685
+JobID           JobName  AllocCPUS     ReqMem     MaxRSS  Timelimit    Elapsed
+------------ ---------- ---------- ---------- ---------- ---------- ----------
+5518685      ribodetec+         20        40G              06:00:00   01:43:54
+5518685.bat+      batch         20                22.39G              01:43:54
+5518685.ext+     extern         20                     0              01:43:54
+
+```
+
+Took 22 GB and 1 hour 43min (compared to 08:26 hours and used 38.31 Gb of RAM for sortmerna (excluding gunzipping, merging, and unmerging).
+
+
+Let's compare number of reads sorted as rRNA with sortmerna vs ribodetector
+
+```{bash, eval=FALSE}
+
+
+# Sort me rRNA
+srun -p medium --time=00:20:00 --mem=10G seqkit stats 01_Ad_L1_mRNA.fq 01_Ad_L1_aligned.fq
+
+processed files:  2 / 2 [] ETA: 0s. done
+file                 format  type     num_seqs         sum_len  min_len  avg_len  max_len
+01_Ad_L1_mRNA.fq     FASTQ   DNA   120,612,416  12,029,946,265       25     99.7      100
+01_Ad_L1_aligned.fq  FASTQ   DNA     6,542,752     652,961,464       35     99.8      100
+
+
+srun -p medium --time=00:10:00 --mem=10G seqkit stats reads.nonrrna.1.fq
+reads.nonrrna.1.fq  FASTQ   DNA   62,903,350  6,275,070,014       25     99.8      100
+
+```
+
+Total number of reads: 63577584 (63.5M)
+
+Sortmerna
+
+> 120612416/2
+[1] 60306208
+
+60,306,208 => 60M reads retrieved as not rRNA.
+
+ribodetector
+
+62,903,350 => 62.9M reads retrieved as not rRNA.
+
+Sortmerna found 2.6M extra reads mapping rRNAs.
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector_cpu
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=06:00:00
+#SBATCH --cpus-per-task=20
+#SBATCH --threads-per-core=1
+#SBATCH --mem=40gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=job-%x-%j.out
+#SBATCH --error=job-%x-%j.err
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+ribodetector_cpu -t 20 \
+  -l 100 \
+  -i $READ1 $READ2 \
+  -e rrna \
+  --chunk_size 256 \
+  -o $OUTPUT_READ1 $OUTPUT_READ2
+
+```
+
+
+```{bash, eval=FALSE}
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trimmed_reads
+
+sbatch sbatch_ribodetector.sh --export=READ1=02_Pm_L1_1.trimmed.fq,READ2=02_Pm_L1_1.trimmed.fq,OUTPUT_READ1=rrna_removed/02_Pm_L1_1.trimmed.rm_rrna.fq,OUTPUT_READ2=rrna_removed/02_Pm_L1_2.trimmed.rm_rrna.fq
+
+```
+
+### GPU version
+
+From the SCC, I need to use the scc-gpu partion, which has access to NVIDIA A100 Tensor Core GPU (https://www.nvidia.com/en-us/data-center/a100/)
+
+
+```{bash, eval=FALSE}
+
+sinfo -o "%25N  %5c  %10m  %32f  %10G %18P " | grep gpu | grep scc-gpu
+ggpu150                    128    515810      ssd,inet,wlcg,cpu_fixed,80gb,zen  gpu:A100:4 scc-gpu
+ggpu[135-136]              128    515810      ssd,inet,wlcg,cpu_fixed,zen3,mil  gpu:A100:4 scc-gpu
+ggpu[138-149,151-158,211-  64+    515810+     ssd,inet,wlcg,cpu_fixed,80gb,zen  gpu:A100:4 scc-gpu
+ggpu[194-199]              128    515810+     ssd,inet,80gb,zen3,milan          gpu:A100:4 scc-gpu
+ggpu237                    192    1031000     ssd,inet,96gb,sapphirerapids,vas  gpu:H100:4 scc-gpu
+
+```
+
+```{bash, eval=FALSE}
+srun --time=00:10:00 --pty -p gpu /bin/bash
+# Works
+
+zicola@agq008
+```
+
+agq nodes (https://docs.hpc.gwdg.de/how_to_use/spack/index.html)
+
+```{bash, eval=FALSE}
+# https://chat.uni-goettingen.de/#/room/#hpc-users:gwdg.de/$S3hbla6bqoWuLfoIghwkRoEO1MrVsJtrryGg-4modr0
+
+sinfo -p gpu --format=%N,%G NODELIST,GRES agq[002-014]
+NODELIST,GRES
+agq[007-012],gpu:RTX5000:4(S:0-1)
+agq[013-014],gpu:RTX5000:4(S:0-1),shard:RTX5000:8(S:0-1)
+
+```
+
+Nodes	CPU and OS Architecture/Target	Fabric	cuda_arch	Partitions
+agqXXX, agtXXX	linux-scientific7-cascadelake	OPA	70	gpu
+
+https://gwdg.de/hpc/systems/scc/
+
+CPU: 2 x Xeon Gold 6242
+GPU: 4 x Quadro RTX5000 (16 Gb VRAM, 3072 FP32 cores, 384 tensor cores, 75 compute capacity)
+
+agq node has 192 Gb of GPU RAM
+
+
+```{bash, eval=FALSE}
+srun --time=00:10:00 --pty -p gpu -G 1 /bin/bash
+
+# logged on node agq009
+
+echo $CUDA_VISIBLE_DEVICES
+0
+
+nvidia-smi
+Sat Feb  1 13:55:20 2025
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 550.144.03             Driver Version: 550.144.03     CUDA Version: 12.4     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Quadro RTX 5000                On  |   00000000:86:00.0 Off |                  Off |
+| 34%   29C    P8              8W /  230W |       1MiB /  16384MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+```
+
+
+
+Use default parameter of ribodetect
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector_gpu
+#SBATCH -t 02:00:00
+#SBATCH --threads-per-core=1
+#SBATCH -p gpu
+#SBATCG -G 1
+#SBATCH --mem=15G
+#SBATCH --cpus-per-task=10
+#SBATCH -o job-%x-%j.out
+#SBATCH -e job-%x-%j.err
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+# Load cuda, otherwise, error message  ERROR  No visible CUDA devices! from ribodetector
+module load cuda/12.1.1
+
+ribodetector --threads 10 \
+  --len 100 \
+  --input 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq \
+  --memory 12 \
+  --ensure rrna \
+  --output reads.gpu.nonrrna.1.fq reads.gpu.nonrrna.2.fq && date
+
+```
+
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector_gpu
+#SBATCH -t 02:00:00
+#SBATCH --threads-per-core=1
+#SBATCH -p gpu
+#SBATCH -G 1
+#SBATCH --gres=gpu:1
+#SBATCH --mem=15G
+#SBATCH --cpus-per-task=10
+#SBATCH -o job-%x-%j.out
+#SBATCH -e job-%x-%j.err
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "  I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Submitting job with sbatch from directory: ${SLURM_SUBMIT_DIR}"
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+# Load cuda, otherwise, error message  ERROR  No visible CUDA devices! from ribodetector
+module load cuda/12.1.1
+
+ribodetector --threads 10 \
+  --len 100 \
+  --input 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq \
+  --memory 12 \
+  --ensure rrna \
+  --output reads.gpu.nonrrna.1.fq reads.gpu.nonrrna.2.fq
+
+```
+
+
+
+#### Interactive run
+
+```{bash, eval=FALSE}
+srun --time=02:00:00 --mem=15G --cpus-per-task=10 --threads-per-core=1 --pty -p gpu -G 1 /bin/bash
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+# Load cuda, otherwise, error message  ERROR  No visible CUDA devices! from ribodetector
+module load cuda/12.1.1
+
+ribodetector --threads 10 \
+  --len 100 \
+  --input 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq \
+  --memory 12 \
+  --ensure rrna \
+  --output reads.gpu.nonrrna.1.fq reads.gpu.nonrrna.2.fq
+
+```
+
+Start run Sat Feb  1 14:01:37 CET 2025
+
+The screen was killed and there were not output files.
+
+
+# Trinity
+
+
+## 01_Ad
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 4909774
+JobName: Trinity
+Submitted: 2025-01-09T11:00:42
+Started: 2025-01-09T11:01:32
+Ended: 2025-01-09T20:00:00
+Elapsed: 539 min, Limit: 2880 min, Difference: 2341 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 143.73 core-hours
+=======================================================
+```
+
+
+## 02_Pm
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037510
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:30:58
+Ended: 2025-01-16T05:29:00
+Elapsed: 659 min, Limit: 720 min, Difference: 61 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 175.73 core-hours
+=======================================================
+
+```
+
+## 03_Zt
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037511
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:33:29
+Ended: 2025-01-16T02:21:09
+Elapsed: 468 min, Limit: 720 min, Difference: 252 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 124.80 core-hours
+=======================================================
+```
+
+
+## 04_Asp
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037512
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-15T18:43:26
+Ended: 2025-01-16T01:05:36
+Elapsed: 383 min, Limit: 720 min, Difference: 337 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 102.13 core-hours
+=======================================================
+
+```
+
+
+## 05_G
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037513
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T01:05:50
+Ended: 2025-01-16T09:00:03
+Elapsed: 475 min, Limit: 720 min, Difference: 245 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 126.67 core-hours
+=======================================================
+```
+
+
+## 06_Ol
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037514
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T09:00:47
+Ended: 2025-01-16T16:55:44
+Elapsed: 475 min, Limit: 720 min, Difference: 245 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 126.67 core-hours
+=======================================================
+```
+
+## 07_Pr
+
+```{bash, eval=FALSE}
+
+============ Job Information ==========================
+JobID: 5037515
+JobName: Trinity
+Submitted: 2025-01-15T18:04:04
+Started: 2025-01-16T09:51:54
+Ended: 2025-01-16T17:41:27
+Elapsed: 470 min, Limit: 720 min, Difference: 250 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 125.33 core-hours
+=======================================================
+```
+
+
+## 08_Ar
+
+Time out
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5037516
+JobName: Trinity
+Submitted: 2025-01-15T18:04:05
+Started: 2025-01-16T09:51:54
+Ended: 2025-01-16T21:52:17
+Elapsed: 721 min, Limit: 720 min, Difference: -1 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 192.27 core-hours
+=======================================================
+```
+
+Based on the forum, I can rerun Trinity command and it will start from the last completed checkpoint
+
+
+```{bash, eval=FALSE}
+i="08_Ar"
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh
+```
+
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5056408
+JobName: Trinity
+Submitted: 2025-01-17T08:47:18
+Started: 2025-01-17T08:47:24
+Ended: 2025-01-17T11:05:41
+Elapsed: 139 min, Limit: 720 min, Difference: 581 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 37.07 core-hours
+=======================================================
+```
+
+Finished in 139 min for the remaining steps.
+
+
+# Fungal presence
+
+```{bash, eval=FALSE}
+
+for i in *_Taxonomy_report.tabular; do 
+  echo -e "\n======$i"
+  awk '$9=="fung:fungi" {print $0}' $i | \
+  cut -f6,7 | sort | uniq -c | sort | sed 's/^\s*//' | \
+  awk '{print $2,$3,$1}'  | sort -k3nr | head
+done
+
+======01_Ad_Taxonomy_report.tabular
+Mucor circinelloides 454
+Mucor velutinosus 414
+Mucor lusitanicus 410
+Mucor irregularis 267
+Mucor racemosus 118
+Pilaira anomala 100
+Mucor plumbeus 90
+Thamnidium elegans 80
+Mucor piriformis 69
+Mucor mucedo 66
+
+======02_Pm_Taxonomy_report.tabular
+Mucor indicus 225
+Mucor circinelloides 82
+Gigaspora margarita 79
+Mucor racemosus 68
+Mucor lusitanicus 65
+Mucor velutinosus 62
+Choanephora cucurbitarum 56
+Mucor irregularis 56
+Massospora cicadina 54
+Gilbertella persicaria 53
+
+======03_Zt_Taxonomy_report.tabular
+Massospora cicadina 32
+Gigaspora margarita 25
+Entomophthora muscae 21
+Gigaspora rosea 21
+Mucor irregularis 16
+Diversispora epigaea 15
+Rhizophagus clarus 12
+Mucor lusitanicus 11
+Mucor mucedo 11
+Mucor racemosus 7
+
+======04_Asp_Taxonomy_report.tabular
+Massospora cicadina 32
+Gigaspora margarita 31
+Gigaspora rosea 28
+Diversispora epigaea 17
+Entomophthora muscae 15
+Mucor circinelloides 7
+Thamnidium elegans 7
+Mucor irregularis 6
+Geosiphon pyriformis 5
+Mucor lusitanicus 5
+
+======05_G_Taxonomy_report.tabular
+Gigaspora margarita 45
+Massospora cicadina 41
+Gigaspora rosea 30
+Entomophthora muscae 23
+Diversispora epigaea 22
+Rhizophagus clarus 12
+Geosiphon pyriformis 9
+Mucor irregularis 9
+Rhizophagus irregularis 8
+Cunninghamella bertholletiae 6
+
+======06_Ol_Taxonomy_report.tabular
+Mucor irregularis 60
+Gigaspora margarita 40
+Massospora cicadina 36
+Gigaspora rosea 33
+Entomophthora muscae 28
+Mucor racemosus 28
+Mucor circinelloides 25
+Mucor mucedo 22
+Mucor lusitanicus 21
+Thamnidium elegans 20
+
+======07_Pr_Taxonomy_report.tabular
+Gigaspora margarita 41
+Massospora cicadina 38
+Entomophthora muscae 19
+Rhizophagus clarus 18
+Gigaspora rosea 17
+Diversispora epigaea 15
+Mucor piriformis 9
+Linnemannia elongata 7
+Podila humilis 6
+Rhizophagus irregularis 6
+
+======08_Ar_Taxonomy_report.tabular
+Neoconidiobolus thromboides 35
+Massospora cicadina 17
+Gigaspora margarita 14
+Gigaspora rosea 10
+Entomophthora muscae 8
+Cunninghamella blakesleeana 5
+Rhizophagus irregularis 5
+Backusella circina 4
+Diversispora epigaea 4
+Halteromyces radiatus 4
+
+```
+
 
 
 # Trinotate
 
 Wiki: https://github.com/Trinotate/Trinotate/wiki/Software-installation-and-data-required
-
 
 Reuse script used for OPM analysis.
 
@@ -1012,6 +1736,46 @@ done < list_species.txt
 
     
 ```
+
+
+
+## Download manually eggnog.db.gz
+
+I can't gunzip the eggnog.db.gz so I think it is corrupted. Redownload from the eggnog5.embl.de website
+
+```{bash, eval=FALSE}
+http://eggnog5.embl.de/download/emapperdb-5.0.2/
+../
+eggnog.db.gz                                       02-Mar-2021 14:01      6G
+eggnog.taxa.tar.gz                                 02-Mar-2021 14:04     69M
+eggnog_proteins.dmnd.gz                            02-Mar-2021 14:04      5G
+mmseqs.tar.gz                                      02-Mar-2021 14:07      5G
+pfam.tar.gz                                        02-Mar-2021 14:08    938M
+
+```
+
+There are from March 2nd 2021, as my files downloaded during the create step of Trinity
+
+```{bash, eval=FALSE}
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
+# Old file
+-rw-r----- 1 zicola UANP 6.4G Mar  2  2021 eggnog.db.gz
+md5sum eggnog.db.gz
+f58b698b3f0bfac44ec8301bb83eb517  eggnog.db.gz
+
+mv eggnog.db.gz eggnog.db.gz.old
+
+wget http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.db.gz
+
+md5sum eggnog.db.gz
+60688b3e21d0afbab97002dfb78ac324  eggnog.db.gz
+# Indeedm the md5 is different
+
+srun -p medium --time=05:00:00 gunzip eggnog.db.gz
+# Now 39 Gb
+-rw-r----- 1 zicola UANP  39G Mar  2  2021 eggnog.db
+```
+
 
 
 ## Trinotate
@@ -1663,3 +2427,435 @@ JobID           JobName  AllocCPUS     ReqMem     MaxRSS    Elapsed
 ```
 
 Took only 48 Mb of RAM and 27 min
+
+
+
+# Troubelshoot path binding in apptainer
+
+## Anchomenus_dorsalis
+
+Now that I have TRINOTATE_DATA_DIR on another path, I need to add it to `--bind` so that the container can find the files.
+
+```{bash, eval=FALSE}
+
+module load apptainer
+
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+export WORKDIR=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
+
+apptainer exec --bind $WORKDIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+      --db Anchomenus_dorsalis/database_Anchomenus_dorsalis.sqlite \
+      --create \
+      --trinotate_data_dir $TRINOTATE_DATA_DIR \
+      --use_diamond
+
+```
+
+Worked!
+
+Now run only the first steps
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=16:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=10gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=trinotate.%J.out
+#SBATCH --error=trinotate.%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module purge
+module load apptainer
+
+# Test that all programs needed are installed
+test_program(){
+  command -v $1 >/dev/null || \
+    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
+}
+
+test_program "tmhmm"
+test_program "signalp6"
+
+# Variables passed to sbatch
+# NAME_SPECIES
+# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
+# Output from Transdecoder $TRANSDECODER_PEP
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
+# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
+sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
+
+
+echo "###############################"
+echo "Trinotate Init"
+date
+echo "###############################"
+
+apptainer exec --workdir ${PATH_DIR}/trinotate_output/${NAME_SPECIES} --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db --init \
+   --gene_trans_map $GENE_TRANS_MAP \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP
+
+echo "##############################"
+echo  "Trinotate Run"
+date
+echo "##############################"
+
+apptainer exec --workdir ${PATH_DIR}/trinotate_output/${NAME_SPECIES} --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --CPU ${SLURM_CPUS_ON_NODE} \
+   --db $sqlite_db \
+   --run ALL \
+   --trinotate_data_dir $TRINOTATE_DATA_DIR \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP \
+   --use_diamond
+
+
+```
+
+
+
+
+```{bash, eval=FALSE}
+work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+i="Anchomenus_dorsalis"
+cd $i
+sbatch --export=NAME_SPECIES=$i,GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep ../05_trinotate.sh
+
+
+```
+
+
+It seems signalP and tmhmmv2 worked but the not the report production (empty file).
+
+Summary MEM needed
+
+```{bash, eval=FALSE}
+
+reportseff 5246016  --format +AllocTRES,TRESUsageInMax
+    JobID    State       Elapsed  TimeEff   CPUEff   MemEff             AllocTRES                                          TRESUsageInMax
+  5246016  COMPLETED    07:42:15   48.2%    98.8%    18.0%    billing=2,cpu=1,mem=20G,node=1   cpu=07:36:44,energy=0,fs/disk=2642600232,mem=3778500K,pages=2107,vmem=0
+
+
+sacct -j 5246016 -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS
+JobID           JobName  AllocCPUS     ReqMem     MaxRSS
+------------ ---------- ---------- ---------- ----------
+5246016       trinotate          1        20G
+5246016.bat+      batch          1              3778500K
+5246016.ext+     extern          1                     0
+
+```
+
+Only 3.7 Gb max used and 7.5 hours needed.
+
+
+```{bash, eval=FALSE}
+
+# Bash
+srun --pty -p medium --mem=4G --time=01:00:00  bash
+
+module load apptainer
+
+
+NAME_SPECIES="Anchomenus_dorsalis"
+
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
+# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
+export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
+
+export TRINOTATE_HOME=/usr/local/src/Trinotate
+
+#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
+sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+
+```
+
+
+
+```{bash, eval=FALSE}
+
+# Try with local Trinity but it does not work because DBI perl module is not installed
+~/bin/Trinotate-Trinotate-v4.0.1/Trinotate   --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+
+```
+
+
+I looked at the database with a software (DB Browse for SQLite) and it seems some tables are empty. Signalp and tmhmm are properly filled.
+
+
+
+```{bash, eval=FALSE}
+
+
+work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+
+i="Anchomenus_dorsalis"
+NAME_SPECIES=$i
+GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map
+TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta
+TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep 
+PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db --init \
+   --gene_trans_map $GENE_TRANS_MAP \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP
+```
+
+
+```{bash, eval=FALSE}
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db ${sqlite_db} \
+   --LOAD_EggnogMapper 
+
+
+```
+
+
+
+```{bash, eval=FALSE}
+
+# Remove OK check point, otherwise the DB not created
+rm /scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/cp_trinotate_boilerplate_sqlite_*
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $NAME_SPECIES/database_${NAME_SPECIES}.sqlite \
+   --create \
+   --trinotate_data_dir $TRINOTATE_DATA_DIR \
+   --use_diamond
+   
+# Works
+
+# Delete the __init.ok log file (otherwise, nothing happens)
+rm /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Anchomenus_dorsalis/__init.ok
+
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db --init \
+   --gene_trans_map $GENE_TRANS_MAP \
+   --transcript_fasta $TRINITY_FASTA \
+   --transdecoder_pep $TRANSDECODER_PEP
+
+# Worked, no 504 Mb instead of 340 Mb
+
+# --LOAD_pfam
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+--db ${sqlite_db} --LOAD_pfam  /usr/users/zicola/TrinotatePFAM.out
+
+# --LOAD_swissprot_blastp
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+--db ${sqlite_db} --LOAD_swissprot_blastp /usr/users/zicola/uniprot_sprot.diamond.blastp.outfmt6
+
+# --LOAD_swissprot_blastx
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+--db ${sqlite_db} --LOAD_swissprot_blastx /usr/users/zicola/uniprot_sprot.diamond.blastx.outfmt6
+
+# LOAD_EggnogMapper
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+--db ${sqlite_db} --LOAD_EggnogMapper /usr/users/zicola/eggnog_mapper.emapper.annotations
+
+# --LOAD_signalp
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_signalp ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir/output.gff3
+   
+# --LOAD_tmhmmv2
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_tmhmmv2 ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
+   
+# --LOAD_infernal
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
+   --db $sqlite_db \
+   --LOAD_infernal /usr/users/zicola/infernal.out
+
+# Get report
+apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate --db ${sqlite_db} \
+   --report \
+   --incl_pep \
+   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
+   
+# Extract GO terms
+
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/extract_GO_assignments_from_Trinotate_xls.pl \
+  --Trinotate_xls Trinotate_report.tsv \
+  -G -I > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv.gene_ontology
+
+# Generate trinotate report summary statistics
+apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
+   $TRINOTATE_HOME/util/report_summary/trinotate_report_summary.pl \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv \
+  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report_stats
+   
+```
+
+Worked!!!
+
+```{bash, eval=FALSE}
+ll
+total 851M
+drwxr-x---  3 zicola UANP 4.1K Jan 25 21:12 ./
+drwxr-x--- 10 zicola UANP    0 Jan 24 10:40 ../
+-rw-r-----  1 zicola UANP 176M Jan 25 21:08 Trinotate_report.tsv
+-rw-r-----  1 zicola UANP 4.7M Jan 25 21:12 Trinotate_report.tsv.gene_ontology
+-rw-r-----  1 zicola UANP 4.7M Jan 25 21:12 Trinotate_report_stats.GO
+-rw-r-----  1 zicola UANP  47K Jan 25 21:12 Trinotate_report_stats.GO.slim
+-rw-r-----  1 zicola UANP 333K Jan 25 21:12 Trinotate_report_stats.cXp_summary.html
+-rw-r-----  1 zicola UANP 2.6K Jan 25 21:12 Trinotate_report_stats.eggnog_counts
+-rw-r-----  1 zicola UANP  527 Jan 25 21:12 Trinotate_report_stats.eggnog_counts.funcats
+-rw-r-----  1 zicola UANP  87K Jan 25 21:12 Trinotate_report_stats.kegg.counts
+-rw-r-----  1 zicola UANP  80K Jan 25 21:12 Trinotate_report_stats.pfam.counts
+-rw-r-----  1 zicola UANP 3.2K Jan 25 21:12 Trinotate_report_stats.species_counts
+-rw-r-----  1 zicola UANP 4.4K Jan 25 21:12 Trinotate_report_stats.taxonomy_counts
+-rw-r-----  1 zicola UANP    0 Jan 25 20:42 __init.ok
+-rw-r-----  1 zicola UANP 633M Jan 25 20:59 database_Anchomenus_dorsalis.sqlite
+drwxr-x---  2 zicola UANP    0 Jan 24 17:48 sigP6outdir/
+-rw-r-----  1 zicola UANP 3.7M Jan 24 18:23 tmhmm.v2.out
+-rw-r-----  1 zicola UANP    0 Jan 25 20:52 tmp.emapper_bulk_load.1140688
+-rw-r-----  1 zicola UANP    0 Jan 25 20:55 tmp.signalp_bulk_load.1152221
+-rw-r-----  1 zicola UANP  27K Jan 23 22:00 trinotate.5222088.err
+-rw-r-----  1 zicola UANP 3.2K Jan 23 22:00 trinotate.5222088.out
+-rw-r-----  1 zicola UANP 386K Jan 24 18:23 trinotate.5246016.err
+-rw-r-----  1 zicola UANP  969 Jan 24 18:23 trinotate.5246016.out
+
+
+
+```
+
+the `database_Anchomenus_dorsalis.sqlite` is 633 Mb at the end.
+
+### sbatch_trinotate.sh
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=04_trinotate
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=16:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=12G
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=04_trinotate.%J.out
+#SBATCH --error=04_trinotate.%J.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+
+# Modules to load
+module purge
+module load apptainer
+
+# Create newhome
+mkdir /usr/users/zicola/trinotate_${SPECIES}
+
+export APPTAINERENV_NEWHOME=/usr/users/zicola/trinotate_${SPECIES}
+export APPTAINERENV_SPECIES=$SPECIES
+
+apptainer run -C -B /usr/users/npghpc/ \
+   -B /usr/users/zicola -B /scratch/users/zicola/ /usr/users/zicola/bin/trinotate.v4.0.2.simg /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/04_trinotate.sh
+
+```
+
+Launch sbatch with the species argument.
+
+```{bash, eval=FALSE}
+sbatch --export=SPECIES="Amara_similata" sbatch_trinotate.sh
+```
+
+Works, now, all Trinotate output will go in `~/newhome` instead of `$HOME`.
+
+```{bash, eval=FALSE}
+ll ~/newhome/
+total 51M
+drwxr-x---  3 zicola UANP    6 Jan 27 19:36 ./
+drwx------ 63 zicola UANP 9.3K Jan 27 19:33 ../
+-rw-r-----  1 zicola UANP  20M Jan 27 19:40 TrinotatePFAM.out
+-rw-r-----  1 zicola UANP    0 Jan 27 19:36 __init.ok
+drwxr-x---  2 zicola UANP    0 Jan 27 19:36 __trinotate_run_checkpts/
+-rw-r-----  1 zicola UANP  22M Jan 27 19:40 pfam.log
+-rw-r-----  1 zicola UANP 1.6M Jan 27 19:36 uniprot_sprot.diamond.blastp.outfmt6
+-rw-r-----  1 zicola UANP 1.6M Jan 27 19:36 uniprot_sprot.diamond.blastx.outfmt6
+```
+
+
+```{bash, eval=FALSE}
+sacct -j JOBID -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
+
+sacct -j 5411597  -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
+JobID           JobName  AllocCPUS     ReqMem     MaxRSS    Elapsed
+------------ ---------- ---------- ---------- ---------- ----------
+5411597       trinotate         10        12G              12:43:41
+5411597.bat+      batch         10              8463548K   12:43:41
+5411597.ext+     extern         10                     0   12:43:41
+
+```
+
+12h40 needed.
+
+```{bash, eval=FALSE}
+ls ~/newhome/
+total 475232
+-rw-r----- 1 zicola UANP 124819074 Jan 27 20:11 TrinotatePFAM.out
+-rw-r----- 1 zicola UANP         0 Jan 27 19:36 __init.ok
+drwxr-x--- 2 zicola UANP         2 Jan 28 08:19 __trinotate_run_checkpts
+-rw-r----- 1 zicola UANP  44173297 Jan 28 08:19 eggnog_mapper.emapper.annotations
+-rw-r----- 1 zicola UANP   9483642 Jan 28 02:27 eggnog_mapper.emapper.hits
+-rw-r----- 1 zicola UANP   2365038 Jan 28 08:19 eggnog_mapper.emapper.seed_orthologs
+-rw-r----- 1 zicola UANP 135214516 Jan 28 02:16 infernal.log
+-rw-r----- 1 zicola UANP     80487 Jan 28 02:16 infernal.out
+-rw-r----- 1 zicola UANP 140305066 Jan 27 20:11 pfam.log
+-rw-r----- 1 zicola UANP   1583830 Jan 27 19:36 uniprot_sprot.diamond.blastp.outfmt6
+-rw-r----- 1 zicola UANP   1673060 Jan 27 19:36 uniprot_sprot.diamond.blastx.outfmt6
+
+```
+
+```{bash, eval=FALSE}
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+
+587M Jan 28 08:19 database_Amara_similata.sqlite
+
+```
