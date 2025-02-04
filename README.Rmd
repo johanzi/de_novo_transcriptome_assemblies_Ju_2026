@@ -20,6 +20,9 @@ knitr::opts_chunk$set(echo = TRUE)
 Di and Kathi proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
 
 
+
+Transcriptome assemblies of eight non-target insect species present in autumn rapeseed fields 
+
 # Insect species
 
 Insects collected and identified by Di:
@@ -87,7 +90,6 @@ https://southgreenplatform.github.io/tutorials//bioanalysis/trinity/
 
 https://training.galaxyproject.org/topics/transcriptomics/tutorials/full-de-novo/tutorial.html
 
-
 * Trim data with cutadapt to remove adapters
 
 # Trimming
@@ -133,7 +135,7 @@ cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
     
 ```
 
-The Ar sample shows a polyA adaptor contamination that is gradual from the beginning to the end of the read. It also contains a lower GC content than all other samples. 
+The Ar sample shows a polyA adaptor contamination that is gradual from the beginning to the end of the read. It also contains a lower GC content than all other samples. Ar (Aphidius rhopalosiphi) is the only Hymenoptera among the 8 species (all others are Coleptera) so it may explain why it differs in GC content.
 
 Number of reads after trimming:
 
@@ -1186,6 +1188,7 @@ mkdir ${output_folder}/${file_name}
 ```
 
 
+
 # Trinotate apptainer
 
 https://southgreenplatform.github.io/trainings/trinityTrinotate/TP-annotation/
@@ -1220,6 +1223,9 @@ which tmhmm
 I can't gunzip the eggnog.db.gz so I think it is corrupted. Redownload from the eggnog5.embl.de website
 
 ```{bash, eval=FALSE}
+
+cd /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
+
 http://eggnog5.embl.de/download/emapperdb-5.0.2/
 ../
 eggnog.db.gz                                       02-Mar-2021 14:01      6G
@@ -1228,372 +1234,18 @@ eggnog_proteins.dmnd.gz                            02-Mar-2021 14:04      5G
 mmseqs.tar.gz                                      02-Mar-2021 14:07      5G
 pfam.tar.gz                                        02-Mar-2021 14:08    938M
 
-```
-
-There are from March 2nd 2021, as my files downloaded during the create step of Trinity
-
-```{bash, eval=FALSE}
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
-# Old file
--rw-r----- 1 zicola UANP 6.4G Mar  2  2021 eggnog.db.gz
-md5sum eggnog.db.gz
-f58b698b3f0bfac44ec8301bb83eb517  eggnog.db.gz
-
-mv eggnog.db.gz eggnog.db.gz.old
-
-wget http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.db.gz
-
-md5sum eggnog.db.gz
-60688b3e21d0afbab97002dfb78ac324  eggnog.db.gz
-# Indeedm the md5 is different
-
-srun -p medium --time=05:00:00 gunzip eggnog.db.gz
-# Now 39 Gb
--rw-r----- 1 zicola UANP  39G Mar  2  2021 eggnog.db
-```
-
-
-## Anchomenus_dorsalis
-
-Now that I have TRINOTATE_DATA_DIR on another path, I need to add it to `--bind` so that the container can find the files.
-
-```{bash, eval=FALSE}
-
-module load apptainer
-
-export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
-export TRINOTATE_HOME=/usr/local/src/Trinotate
-
-export WORKDIR=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output
-
-PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output"
-
-apptainer exec --bind $WORKDIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-      --db Anchomenus_dorsalis/database_Anchomenus_dorsalis.sqlite \
-      --create \
-      --trinotate_data_dir $TRINOTATE_DATA_DIR \
-      --use_diamond
-
-```
-
-Worked!
-
-Now run only the first steps
-
-```{bash, eval=FALSE}
-#!/bin/bash
-#SBATCH --job-name=trinotate
-#SBATCH --nodes=1
-#SBATCH --partition=medium
-#SBATCH --time=16:00:00
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=10gb
-#SBATCH --mail-type=END
-#SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=trinotate.%J.out
-#SBATCH --error=trinotate.%J.err
-
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
-echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
-
-# Modules to load
-module purge
-module load apptainer
-
-# Test that all programs needed are installed
-test_program(){
-  command -v $1 >/dev/null || \
-    { echo >&2 " $1 required but not installed. Aborting"; exit 1; }
-}
-
-test_program "tmhmm"
-test_program "signalp6"
-
-# Variables passed to sbatch
-# NAME_SPECIES
-# Output from Trinity $GENE_TRANS_MAP and $TRINITY_FASTA
-# Output from Transdecoder $TRANSDECODER_PEP
-
-PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
-
-# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
-# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
-export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
-
-export TRINOTATE_HOME=/usr/local/src/Trinotate
-
-#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
-sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
-
-
-echo "###############################"
-echo "Trinotate Init"
-date
-echo "###############################"
-
-apptainer exec --workdir ${PATH_DIR}/trinotate_output/${NAME_SPECIES} --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db --init \
-   --gene_trans_map $GENE_TRANS_MAP \
-   --transcript_fasta $TRINITY_FASTA \
-   --transdecoder_pep $TRANSDECODER_PEP
-
-echo "##############################"
-echo  "Trinotate Run"
-date
-echo "##############################"
-
-apptainer exec --workdir ${PATH_DIR}/trinotate_output/${NAME_SPECIES} --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --CPU ${SLURM_CPUS_ON_NODE} \
-   --db $sqlite_db \
-   --run ALL \
-   --trinotate_data_dir $TRINOTATE_DATA_DIR \
-   --transcript_fasta $TRINITY_FASTA \
-   --transdecoder_pep $TRANSDECODER_PEP \
-   --use_diamond
-
+gunzip *
 
 ```
 
 
+## 04_trinotate.sh
 
 
-```{bash, eval=FALSE}
-work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
-
-i="Anchomenus_dorsalis"
-cd $i
-sbatch --export=NAME_SPECIES=$i,GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map,TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta,TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep ../05_trinotate.sh
-
-
-```
-
-
-It seems signalP and tmhmmv2 worked but the not the report production (empty file).
-
-Summary MEM needed
-
-```{bash, eval=FALSE}
-
-reportseff 5246016  --format +AllocTRES,TRESUsageInMax
-    JobID    State       Elapsed  TimeEff   CPUEff   MemEff             AllocTRES                                          TRESUsageInMax
-  5246016  COMPLETED    07:42:15   48.2%    98.8%    18.0%    billing=2,cpu=1,mem=20G,node=1   cpu=07:36:44,energy=0,fs/disk=2642600232,mem=3778500K,pages=2107,vmem=0
-
-
-sacct -j 5246016 -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS
-JobID           JobName  AllocCPUS     ReqMem     MaxRSS
------------- ---------- ---------- ---------- ----------
-5246016       trinotate          1        20G
-5246016.bat+      batch          1              3778500K
-5246016.ext+     extern          1                     0
-
-```
-
-Only 3.7 Gb max used and 7.5 hours needed.
-
-
-```{bash, eval=FALSE}
-
-# Bash
-srun --pty -p medium --mem=4G --time=01:00:00  bash
-
-module load apptainer
-
-
-NAME_SPECIES="Anchomenus_dorsalis"
-
-PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
-
-# Variables (I moved the folder TRINOTATE_DATA_DIR locally for the run to avoid path mess with apptainer)
-# Was originally in /usr/users/zicola/bin/Trinotate-Trinotate-v4.0.1
-export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
-
-export TRINOTATE_HOME=/usr/local/src/Trinotate
-
-#NAME_SPECIES is provided as argument to sbatch (Do not put a uppercase to trinotate_ suffix, it won't work)
-sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
-
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db ${sqlite_db} \
-   --report \
-   --incl_pep \
-   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
-
-```
-
-
-
-```{bash, eval=FALSE}
-
-# Try with local Trinity but it does not work because DBI perl module is not installed
-~/bin/Trinotate-Trinotate-v4.0.1/Trinotate   --db ${sqlite_db} \
-   --report \
-   --incl_pep \
-   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
-
-```
-
-
-I looked at the database with a software (DB Browse for SQLite) and it seems some tables are empty. Signalp and tmhmm are properly filled.
-
-
-
-```{bash, eval=FALSE}
-
-
-work_path="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
-
-i="Anchomenus_dorsalis"
-NAME_SPECIES=$i
-GENE_TRANS_MAP=${work_path}/trinity_output/summary/${i}_trinity.fasta.gene_trans_map
-TRINITY_FASTA=${work_path}/trinity_output/summary/${i}_trinity.fasta
-TRANSDECODER_PEP=${work_path}/transdecoder_output/${i}_trinity.fasta.transdecoder.pep 
-PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
-sqlite_db="${PATH_DIR}/trinotate_output/${NAME_SPECIES}/database_${NAME_SPECIES}.sqlite"
-
-apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db --init \
-   --gene_trans_map $GENE_TRANS_MAP \
-   --transcript_fasta $TRINITY_FASTA \
-   --transdecoder_pep $TRANSDECODER_PEP
-```
-
-
-```{bash, eval=FALSE}
-
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db ${sqlite_db} \
-   --LOAD_EggnogMapper 
-
-
-```
-
-
-
-```{bash, eval=FALSE}
-
-# Remove OK check point, otherwise the DB not created
-rm /scratch/users/zicola/TRINOTATE_DATA_DIR/__chckpts/cp_trinotate_boilerplate_sqlite_*
-
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $NAME_SPECIES/database_${NAME_SPECIES}.sqlite \
-   --create \
-   --trinotate_data_dir $TRINOTATE_DATA_DIR \
-   --use_diamond
-   
-# Works
-
-# Delete the __init.ok log file (otherwise, nothing happens)
-rm /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinotate_output/Anchomenus_dorsalis/__init.ok
-
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db --init \
-   --gene_trans_map $GENE_TRANS_MAP \
-   --transcript_fasta $TRINITY_FASTA \
-   --transdecoder_pep $TRANSDECODER_PEP
-
-# Worked, no 504 Mb instead of 340 Mb
-
-# --LOAD_pfam
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
---db ${sqlite_db} --LOAD_pfam  /usr/users/zicola/TrinotatePFAM.out
-
-# --LOAD_swissprot_blastp
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
---db ${sqlite_db} --LOAD_swissprot_blastp /usr/users/zicola/uniprot_sprot.diamond.blastp.outfmt6
-
-# --LOAD_swissprot_blastx
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
---db ${sqlite_db} --LOAD_swissprot_blastx /usr/users/zicola/uniprot_sprot.diamond.blastx.outfmt6
-
-# LOAD_EggnogMapper
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
---db ${sqlite_db} --LOAD_EggnogMapper /usr/users/zicola/eggnog_mapper.emapper.annotations
-
-# --LOAD_signalp
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db \
-   --LOAD_signalp ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/sigP6outdir/output.gff3
-   
-# --LOAD_tmhmmv2
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db \
-   --LOAD_tmhmmv2 ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/tmhmm.v2.out
-   
-# --LOAD_infernal
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate \
-   --db $sqlite_db \
-   --LOAD_infernal /usr/users/zicola/infernal.out
-
-# Get report
-apptainer exec --bind $PATH_DIR,$TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg $TRINOTATE_HOME/Trinotate --db ${sqlite_db} \
-   --report \
-   --incl_pep \
-   --incl_trans > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv
-   
-# Extract GO terms
-
-apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
-   $TRINOTATE_HOME/util/extract_GO_assignments_from_Trinotate_xls.pl \
-  --Trinotate_xls Trinotate_report.tsv \
-  -G -I > ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv.gene_ontology
-
-# Generate trinotate report summary statistics
-apptainer exec --bind $PATH_DIR -e ~/bin/trinotate.v4.0.2.simg \
-   $TRINOTATE_HOME/util/report_summary/trinotate_report_summary.pl \
-  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report.tsv \
-  ${PATH_DIR}/trinotate_output/${NAME_SPECIES}/Trinotate_report_stats
-   
-```
-
-Worked!!!
-
-```{bash, eval=FALSE}
-ll
-total 851M
-drwxr-x---  3 zicola UANP 4.1K Jan 25 21:12 ./
-drwxr-x--- 10 zicola UANP    0 Jan 24 10:40 ../
--rw-r-----  1 zicola UANP 176M Jan 25 21:08 Trinotate_report.tsv
--rw-r-----  1 zicola UANP 4.7M Jan 25 21:12 Trinotate_report.tsv.gene_ontology
--rw-r-----  1 zicola UANP 4.7M Jan 25 21:12 Trinotate_report_stats.GO
--rw-r-----  1 zicola UANP  47K Jan 25 21:12 Trinotate_report_stats.GO.slim
--rw-r-----  1 zicola UANP 333K Jan 25 21:12 Trinotate_report_stats.cXp_summary.html
--rw-r-----  1 zicola UANP 2.6K Jan 25 21:12 Trinotate_report_stats.eggnog_counts
--rw-r-----  1 zicola UANP  527 Jan 25 21:12 Trinotate_report_stats.eggnog_counts.funcats
--rw-r-----  1 zicola UANP  87K Jan 25 21:12 Trinotate_report_stats.kegg.counts
--rw-r-----  1 zicola UANP  80K Jan 25 21:12 Trinotate_report_stats.pfam.counts
--rw-r-----  1 zicola UANP 3.2K Jan 25 21:12 Trinotate_report_stats.species_counts
--rw-r-----  1 zicola UANP 4.4K Jan 25 21:12 Trinotate_report_stats.taxonomy_counts
--rw-r-----  1 zicola UANP    0 Jan 25 20:42 __init.ok
--rw-r-----  1 zicola UANP 633M Jan 25 20:59 database_Anchomenus_dorsalis.sqlite
-drwxr-x---  2 zicola UANP    0 Jan 24 17:48 sigP6outdir/
--rw-r-----  1 zicola UANP 3.7M Jan 24 18:23 tmhmm.v2.out
--rw-r-----  1 zicola UANP    0 Jan 25 20:52 tmp.emapper_bulk_load.1140688
--rw-r-----  1 zicola UANP    0 Jan 25 20:55 tmp.signalp_bulk_load.1152221
--rw-r-----  1 zicola UANP  27K Jan 23 22:00 trinotate.5222088.err
--rw-r-----  1 zicola UANP 3.2K Jan 23 22:00 trinotate.5222088.out
--rw-r-----  1 zicola UANP 386K Jan 24 18:23 trinotate.5246016.err
--rw-r-----  1 zicola UANP  969 Jan 24 18:23 trinotate.5246016.out
-
-
-
-```
-
-the `database_Anchomenus_dorsalis.sqlite` is 633 Mb at the end.
-
-
-
-
-
-
-
-## New Trinotate script
-
-
-### 04_trinotate.sh
+First steps are in apptainer:
+- Create database
+- Initialize database
+- Run all but tmhmm and signalp softwares and load in database
 
 ```{bash, eval=FALSE}
 
@@ -1604,7 +1256,7 @@ export HOME=$NEWHOME
 export TRINOTATE_HOME=/usr/local/src/Trinotate
 
 # Path to Trinity and Transdecoder files
-export WORKPATH=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+export WORKPATH=/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
 export GENE_TRANS_MAP=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta.gene_trans_map
 export TRINITY_FASTA=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta
 export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}_trinity.fasta.transdecoder.pep 
@@ -1645,20 +1297,20 @@ chmod +x 04_trinotate.sh
 ```
 
 
-#### sbatch_trinotate.sh
+### sbatch_04_trinotate.sh
 
 ```{bash, eval=FALSE}
 #!/bin/bash
-#SBATCH --job-name=trinotate
+#SBATCH --job-name=04_trinotate
 #SBATCH --nodes=1
 #SBATCH --partition=medium
-#SBATCH --time=16:00:00
+#SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=12G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=trinotate.%J.out
-#SBATCH --error=trinotate.%J.err
+#SBATCH --output=job-%x-%j.out
+#SBATCH --error=job-%x-%j.err
 
 mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
 
@@ -1671,11 +1323,13 @@ echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute n
 module purge
 module load apptainer
 
-export APPTAINERENV_NEWHOME=/usr/users/zicola/newhome
+# Create newhome
+mkdir /usr/users/zicola/trinotate_${SPECIES}
+
+export APPTAINERENV_NEWHOME=/usr/users/zicola/trinotate_${SPECIES}
 export APPTAINERENV_SPECIES=$SPECIES
 
-apptainer run -C -B /usr/users/npghpc/ \
-   -B /usr/users/zicola -B /scratch/users/zicola/ /usr/users/zicola/bin/trinotate.v4.0.2.simg /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/04_trinotate.sh
+apptainer run -C -B /usr/users/zicola -B /scratch/users/zicola/ /usr/users/zicola/bin/trinotate.v4.0.2.simg /scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/04_trinotate.sh
 
 ```
 
@@ -1740,20 +1394,26 @@ cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insec
 ```
 
 
-### 05_trinotate.sh
+## 05_trinotate.sh
+
+Second step:
+- Run tmhmm and load results in database
+- Run signalp and load results in database
+- Generate Trinotate report and GO annotations
 
 ```{bash, eval=FALSE}
+
 #!/bin/bash
 #SBATCH --job-name=05_trinotate
 #SBATCH --nodes=1
 #SBATCH --partition=medium
-#SBATCH --time=12:00:00
+#SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=5G
+#SBATCH --mem=10G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=trinotate_second_part.%J.out
-#SBATCH --error=trinotate_second_part.%J.err
+#SBATCH --output=job-%x-%j.out
+#SBATCH --error=job-%x-%j.err
 
 mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
 
@@ -1775,15 +1435,11 @@ test_program(){
 test_program "tmhmm"
 test_program "signalp6"
 
-
-# New home not to fill my real home with Trinotate output files
-export HOME=$NEWHOME
-
 # Path to trinotate executable
 export TRINOTATE_HOME=/usr/local/src/Trinotate
 
 # Path to Trinity and Transdecoder files
-export WORKPATH=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+export WORKPATH=/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
 export GENE_TRANS_MAP=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta.gene_trans_map
 export TRINITY_FASTA=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta
 export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}_trinity.fasta.transdecoder.pep 
@@ -1798,7 +1454,7 @@ echo  "Trinotate Run signalp"
 date
 echo "##############################"
 
-cd $WORKPATH
+cd ${WORKPATH}/trinotate_output/${SPECIES}/
 
 signalp6 --fastafile $TRANSDECODER_PEP \
    --output_dir ${WORKPATH}/trinotate_output/${SPECIES}/sigP6outdir \
@@ -1845,13 +1501,13 @@ date
 
 apptainer exec -C -B /usr/users/zicola -B $WORKPATH -B $TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg \
    $TRINOTATE_HOME/util/extract_GO_assignments_from_Trinotate_xls.pl \
-  --Trinotate_xls Trinotate_report.tsv \
+  --Trinotate_xls ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report.tsv \
   -G -I > ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report.tsv.gene_ontology
 
 # Tke few seconds
 
 # Generate trinotate report summary statistics
-apptainer exec-C -B /usr/users/zicola -B $WORKPATH -e ~/bin/trinotate.v4.0.2.simg \
+apptainer exec -C -B /usr/users/zicola -B $WORKPATH -e ~/bin/trinotate.v4.0.2.simg \
    $TRINOTATE_HOME/util/report_summary/trinotate_report_summary.pl \
   ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report.tsv \
   ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report_stats
@@ -1864,9 +1520,449 @@ echo "##########################"
 ```
 
 
+## Run
+
+
+### Step 04
+
+```{bash, eval=FALSE}
+
+sbatch --export=SPECIES="Anchomenus_dorsalis" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Amara_similata" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Pterostichus_melanarius" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Zabrus_tenebrioides" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_affinis" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_eous" sbatch_trinotate.sh
+
+sbatch --export=SPECIES="Poecilus_cupreus" sbatch_trinotate.sh
+
+```
+
+
+Job for Aphidius_rhopalosiphi overtime the 16 hours and was killed during infernal run. Relaunch with a 24h time. Trinotate should consider the checkpoint files in $HOME and start from infernal.
+
+```{bash, eval=FALSE}
+
+rm ~/trinotate_Aphidius_rhopalosiphi/infernal*
+
+\ls -1 trinotate_Aphidius_rhopalosiphi/__trinotate_run_checkpts/
+diamond.uniprot_sprot.blastp.loaded.ok
+diamond.uniprot_sprot.blastp.ok
+diamond.uniprot_sprot.blastx.loaded.ok
+diamond.uniprot_sprot.blastx.ok
+pfam_hmmsearch.ok
+pfam_hmmsearch_loading.ok
+pipeliner.36.cmds
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
+
+```
+
+Yes, it skips all steps until infernal and continue there.
+
+
+Job killed again due to time out but now at the emapper part. Relaunch again
+
+
+```{bash, eval=FALSE}
+
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
+
+```
+
+```{bash, eval=FALSE}
+# emapper.py  -i /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Aphidius_rhopalosiphi_trinity.fasta.transdecoder.pep --cpu 10 --data_dir /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR -o eggnog_mapper
+Output files detected in disk. Use --resume or --override to continue
+
+```
+
+Fail, I need first to remove the eggmapper content in `~/trinotate_Aphidius_rhopalosiphi` that was killed
 
 
 
+### Step 05
+
+Wait this job is finished before launching `05_trinotate.sh`
+
+```{bash, eval=FALSE}
+
+sbatch --export=SPECIES="Pterostichus_melanarius" 05_trinotate.sh
+
+sbatch --export=SPECIES="Zabrus_tenebrioides" 05_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_affinis" 05_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_eous" 05_trinotate.sh
+
+sbatch --export=SPECIES="Anchomenus_dorsalis" 05_trinotate.sh
+
+sbatch --export=SPECIES="Poecilus_cupreus" 05_trinotate.sh
+
+sbatch --export=SPECIES="Amara_similata" 05_trinotate.sh
+# Done
+
+
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" 05_trinotate.sh
+
+```
+
+
+# BUSCO
+
+Based on the odb10 list (`busco --list-datasets`), there are no coleoptera database. I would therefore use insecta_odb12 to be more general. However, for Aphidius_rhopalosiphi, I can use the hymenoptera_odb10 database.
+
+See doc on https://busco.ezlab.org/busco_userguide.html#running-busco
+
+```{bash, eval=FALSE}
+
+busco --list-datasets
+
+```
+
+
+## Get longest isoforms
+
+```{bash, eval=FALSE}
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
+
+export WORKDIR=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
+
+for i in *fasta; do
+   apptainer exec -e -C -B $WORKDIR /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg \
+/usr/local/bin/util/misc/get_longest_isoform_seq_per_trinity_gene.pl $WORKDIR/$i > $WORKDIR/longest_isoforms/${i%.*}.longest_isoforms.fasta
+done
+
+```
+
+```{bash, eval=FALSE}
+seqkit stats *
+processed files:  9 / 9 [======================================] ETA: 0s. done
+file                                                    format  type  num_seqs     sum_len  min_len  avg_len  max_len
+Amara_similata_trinity.longest_isoforms.fasta           FASTA   DNA     45,382  39,170,740      201    863.1   24,631
+Anchomenus_dorsalis_trinity.longest_isoforms.fasta      FASTA   DNA     64,702  49,429,920      201      764   33,453
+Aphidius_rhopalosiphi_trinity.longest_isoforms.fasta    FASTA   DNA    201,906  96,690,872      201    478.9   35,915
+Harpalus_affinis_trinity.longest_isoforms.fasta         FASTA   DNA     62,673  45,743,303      201    729.9   25,018
+Harpalus_eous_trinity.longest_isoforms.fasta            FASTA   DNA     63,803  46,868,568      201    734.6   20,450
+Poecilus_cupreus_trinity.longest_isoforms.fasta         FASTA   DNA     56,672  47,028,774      201    829.8   24,578
+Pterostichus_melanarius_trinity.longest_isoforms.fasta  FASTA   DNA     92,836  57,883,850      201    623.5   26,406
+Zabrus_tenebrioides_trinity.longest_isoforms.fasta      FASTA   DNA     51,663  43,363,104      201    839.3   26,778
+longest_isoforms.fasta                                  FASTA   DNA     51,663  43,363,104      201    839.3   26,778
+
+```
+
+
+Compared to the number of peptides from Transdecoder
+
+```{bash, eval=FALSE}
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output
+
+seqkit stats *pep
+
+processed files:  8 / 8 [======================================] ETA: 0s. done
+file                                                    format  type     num_seqs     sum_len  min_len  avg_len  max_len
+Amara_similata_trinity.fasta.transdecoder.pep           FASTA   Protein    30,556  14,245,018       88    466.2    7,989
+Anchomenus_dorsalis_trinity.fasta.transdecoder.pep      FASTA   Protein    44,842  18,688,372       87    416.8   11,078
+Aphidius_rhopalosiphi_trinity.fasta.transdecoder.pep    FASTA   Protein    40,022  14,313,010       85    357.6   11,722
+Harpalus_affinis_trinity.fasta.transdecoder.pep         FASTA   Protein    41,824  17,869,618       86    427.3    7,821
+Harpalus_eous_trinity.fasta.transdecoder.pep            FASTA   Protein    37,651  15,771,161       86    418.9    5,529
+Poecilus_cupreus_trinity.fasta.transdecoder.pep         FASTA   Protein    42,557  19,020,139       87    446.9    7,179
+Pterostichus_melanarius_trinity.fasta.transdecoder.pep  FASTA   Protein    47,305  18,248,733       85    385.8    8,424
+Zabrus_tenebrioides_trinity.fasta.transdecoder.pep      FASTA   Protein    34,677  14,622,474       85    421.7    8,600
+
+```
+
+
+
+## Run BUSCO
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=busco
+#SBATCH --partition=medium
+#SBATCH --time 00:30:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=8G
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=busco.%J.out
+#SBATCH --error=busco.%J.err
+
+module load busco/5.4.3
+
+busco -i $TRINITY_FILE -m transcriptome --lineage_dataset insecta_odb10 --cpu 8 --out busco_output/$SPECIES
+
+```
+
+
+```{bash, eval=FALSE}
+
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
+
+while read i; do
+sbatch --export=TRINITY_FILE=longest_isoforms/${i}_trinity.longest_isoforms.fasta,SPECIES=$i ../../06_busco.sh
+done < species.txt
+
+sbatch --export=TRINITY_FILE=longest_isoforms/Pterostichus_melanarius_trinity.longest_isoforms.fasta,SPECIES=Pterostichus_melanarius ../../06_busco.sh
+
+```
+
+
+## Separate run for Aphidius_rhopalosiphi
+
+Do a second run for Aphidius which is a hymenoptera
+
+hymenoptera_odb10
+
+```{bash, eval=FALSE}
+srun --time=00:20:00 --cpus-per-task=8 --mem=8G -p medium busco -i longest_isoforms/Aphidius_rhopalosiphi_trinity.longest_isoforms.fasta -m transcriptome --lineage_dataset hymenoptera_odb10 --cpu 8 --out busco_output/Aphidius_rhopalosiphi_hymenoptera_odb10 &
+
+```
+
+
+
+## Summarize BUSCO results
+
+```{bash, eval=FALSE}
+cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/busco_output/
+
+mkdir my_summaries
+
+find . -maxdepth 2 -name "short_summary*txt" -exec cp {} my_summaries/ \;
+
+python /usr/product/bioinfo/BUSCO/5.4.3/bin/generate_plot.py -wd my_summaries
+
+```
+
+Run R code from `my_summaries/busco_figure.R`:
+
+```{r}
+######################################
+#
+# BUSCO summary figure
+# @version 4.0.0
+# @since BUSCO 2.0.0
+#
+# Copyright (c) 2016-2022, Evgeny Zdobnov (ez@ezlab.org)
+# Licensed under the MIT license. See LICENSE.md file.
+#
+######################################
+
+# Load the required libraries
+library(ggplot2)
+library("grid")
+
+# !!! CONFIGURE YOUR PLOT HERE !!!
+# Output
+my_output <- paste("my_summaries/","busco_figure.png",sep="/")
+my_width <- 20
+my_height <- 15
+my_unit <- "cm"
+
+# Colors
+my_colors <- c("#56B4E9", "#3492C7", "#F0E442", "#F04442")
+# Bar height ratio
+my_bar_height <- 0.75
+
+# Legend
+my_title <- "BUSCO Assessment Results"
+
+# Font
+my_family <- "sans"
+my_size_ratio <- 1
+
+# !!! SEE YOUR DATA HERE !!!
+# Your data as generated by python, remove or add more
+my_species <- c('Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis')
+my_species <- factor(my_species)
+my_species <- factor(my_species,levels(my_species)[c(length(levels(my_species)):1)]) # reorder your species here just by changing the values in the vector :
+my_percentage <- c(84.9, 13.1, 1.0, 1.0, 91.1, 5.6, 1.5, 1.8, 74.1, 1.6, 7.7, 16.6, 91.1, 3.0, 2.3, 3.6, 96.0, 0.7, 1.1, 2.2, 93.8, 2.9, 0.8, 2.5, 94.7, 3.1, 0.7, 1.5, 94.3, 1.9, 1.5, 2.3, 95.4, 1.7, 1.0, 1.9)
+my_values <- c(1160, 179, 14, 14, 1246, 76, 20, 25, 4441, 96, 459, 995, 1245, 41, 32, 49, 1313, 9, 15, 30, 1282, 40, 11, 34, 1295, 43, 10, 19, 1289, 26, 20, 32, 1304, 23, 14, 26)
+
+######################################
+######################################
+######################################
+# Code to produce the graph
+labsize = 1
+if (length(levels(my_species)) > 10){
+ labsize = 0.66
+}
+print("Plotting the figure ...")
+category <- c(rep(c("S","D","F","M"),c(1)))
+category <-factor(category)
+category = factor(category,levels(category)[c(4,1,2,3)])
+df = data.frame(my_species,my_percentage,my_values,category)
+
+figure <- ggplot() +
+
+  geom_bar(aes(y = my_percentage, x = my_species, fill = category), position = position_stack(reverse = TRUE), data = df, stat="identity", width=my_bar_height) +
+  coord_flip() +
+  theme_gray(base_size = 8) +
+  scale_y_continuous(labels = c("0","20","40","60","80","100"), breaks = c(0,20,40,60,80,100)) +
+  scale_fill_manual(values = my_colors,labels =c(" Complete (C) and single-copy (S)  ",
+                                                 " Complete (C) and duplicated (D)",
+                                                 " Fragmented (F)  ",
+                                                 " Missing (M)")) +
+  ggtitle(my_title) +
+  xlab("") +
+  ylab("\n%BUSCOs") +
+
+  theme(plot.title = element_text(family=my_family, hjust=0.5, colour = "black", size = rel(2.2)*my_size_ratio, face = "bold")) +
+  theme(legend.position="top",legend.title = element_blank()) +
+  theme(legend.text = element_text(family=my_family, size = rel(1.2)*my_size_ratio)) +
+  theme(panel.background = element_rect(color="#FFFFFF", fill="white")) +
+  theme(panel.grid.minor = element_blank()) +
+  theme(panel.grid.major = element_blank()) +
+  theme(axis.text.y = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
+  theme(axis.text.x = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
+  theme(axis.line = element_line(size=1*my_size_ratio, colour = "black")) +
+  theme(axis.ticks.length = unit(.85, "cm")) +
+  theme(axis.ticks.y = element_line(colour="white", size = 0)) +
+  theme(axis.ticks.x = element_line(colour="#222222")) +
+  theme(axis.ticks.length = unit(0.4, "cm")) +
+  theme(axis.title.x = element_text(family=my_family, size=rel(1.2)*my_size_ratio)) +
+
+  guides(fill = guide_legend(override.aes = list(colour = NULL))) +
+  guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+  for(i in rev(c(1:length(levels(my_species))))){
+    detailed_values <- my_values[my_species==my_species[my_species==levels(my_species)[i]]]
+    total_buscos <- sum(detailed_values)
+    figure <- figure +
+    annotate("text", label=paste("C:", detailed_values[1] + detailed_values[2], " [S:", detailed_values[1], ", D:", detailed_values[2], "], F:", detailed_values[3], ", M:", detailed_values[4], ", n:", total_buscos, sep=""),
+             y=3, x = i, size = labsize*4*my_size_ratio, colour = "black", hjust=0, family=my_family)
+  }
+
+figure
+
+
+```
+
+Using the hymenoptera database for _Aphidium rhopalosiphi_ yields to lower completedness than while using insecta database. It can be due to the fact that we use only the adult stage and that only a subset of genes are expressed in the adult analyzed. 
+
+
+Without hymenoptera analysis
+
+```{bash, eval=FALSE}
+rm my_summaries/short_summary.specific.hymenoptera_odb10.Aphidius_rhopalosiphi_hymenoptera_odb10.txt
+
+python /usr/product/bioinfo/BUSCO/5.4.3/bin/generate_plot.py -wd my_summaries
+```
+
+```{r}
+######################################
+#
+# BUSCO summary figure
+# @version 4.0.0
+# @since BUSCO 2.0.0
+#
+# Copyright (c) 2016-2022, Evgeny Zdobnov (ez@ezlab.org)
+# Licensed under the MIT license. See LICENSE.md file.
+#
+######################################
+
+# Load the required libraries
+library(ggplot2)
+library("grid")
+
+# !!! CONFIGURE YOUR PLOT HERE !!!
+# Output
+my_output <- paste("my_summaries/","busco_figure.png",sep="/")
+my_width <- 20
+my_height <- 15
+my_unit <- "cm"
+
+# Colors
+my_colors <- c("#56B4E9", "#3492C7", "#F0E442", "#F04442")
+# Bar height ratio
+my_bar_height <- 0.75
+
+# Legend
+my_title <- "BUSCO Assessment Results"
+
+# Font
+my_family <- "sans"
+my_size_ratio <- 1
+
+# !!! SEE YOUR DATA HERE !!!
+# Your data as generated by python, remove or add more
+my_species <- c('Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis')
+my_species <- factor(my_species)
+my_species <- factor(my_species,levels(my_species)[c(length(levels(my_species)):1)]) # reorder your species here just by changing the values in the vector :
+my_percentage <- c(84.9, 13.1, 1.0, 1.0, 91.1, 5.6, 1.5, 1.8, 91.1, 3.0, 2.3, 3.6, 96.0, 0.7, 1.1, 2.2, 93.8, 2.9, 0.8, 2.5, 94.7, 3.1, 0.7, 1.5, 94.3, 1.9, 1.5, 2.3, 95.4, 1.7, 1.0, 1.9)
+my_values <- c(1160, 179, 14, 14, 1246, 76, 20, 25, 1245, 41, 32, 49, 1313, 9, 15, 30, 1282, 40, 11, 34, 1295, 43, 10, 19, 1289, 26, 20, 32, 1304, 23, 14, 26)
+
+######################################
+######################################
+######################################
+# Code to produce the graph
+labsize = 1
+if (length(levels(my_species)) > 10){
+ labsize = 0.66
+}
+print("Plotting the figure ...")
+category <- c(rep(c("S","D","F","M"),c(1)))
+category <-factor(category)
+category = factor(category,levels(category)[c(4,1,2,3)])
+df = data.frame(my_species,my_percentage,my_values,category)
+
+figure <- ggplot() +
+
+  geom_bar(aes(y = my_percentage, x = my_species, fill = category), position = position_stack(reverse = TRUE), data = df, stat="identity", width=my_bar_height) +
+  coord_flip() +
+  theme_gray(base_size = 8) +
+  scale_y_continuous(labels = c("0","20","40","60","80","100"), breaks = c(0,20,40,60,80,100)) +
+  scale_fill_manual(values = my_colors,labels =c(" Complete (C) and single-copy (S)  ",
+                                                 " Complete (C) and duplicated (D)",
+                                                 " Fragmented (F)  ",
+                                                 " Missing (M)")) +
+  ggtitle(my_title) +
+  xlab("") +
+  ylab("\n%BUSCOs") +
+
+  theme(plot.title = element_text(family=my_family, hjust=0.5, colour = "black", size = rel(2.2)*my_size_ratio, face = "bold")) +
+  theme(legend.position="top",legend.title = element_blank()) +
+  theme(legend.text = element_text(family=my_family, size = rel(1.2)*my_size_ratio)) +
+  theme(panel.background = element_rect(color="#FFFFFF", fill="white")) +
+  theme(panel.grid.minor = element_blank()) +
+  theme(panel.grid.major = element_blank()) +
+  theme(axis.text.y = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
+  theme(axis.text.x = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
+  theme(axis.line = element_line(size=1*my_size_ratio, colour = "black")) +
+  theme(axis.ticks.length = unit(.85, "cm")) +
+  theme(axis.ticks.y = element_line(colour="white", size = 0)) +
+  theme(axis.ticks.x = element_line(colour="#222222")) +
+  theme(axis.ticks.length = unit(0.4, "cm")) +
+  theme(axis.title.x = element_text(family=my_family, size=rel(1.2)*my_size_ratio)) +
+
+  guides(fill = guide_legend(override.aes = list(colour = NULL))) +
+  guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+  for(i in rev(c(1:length(levels(my_species))))){
+    detailed_values <- my_values[my_species==my_species[my_species==levels(my_species)[i]]]
+    total_buscos <- sum(detailed_values)
+    figure <- figure +
+    annotate("text", label=paste("C:", detailed_values[1] + detailed_values[2], " [S:", detailed_values[1], ", D:", detailed_values[2], "], F:", detailed_values[3], ", M:", detailed_values[4], ", n:", total_buscos, sep=""),
+             y=3, x = i, size = labsize*4*my_size_ratio, colour = "black", hjust=0, family=my_family)
+  }
+
+figure
+
+#ggsave(figure, file=my_output, width = my_width, height = my_height, unit = my_unit)
+#print("Done")
+
+```
+
+We see a higher rate of duplication for _Anchoenus dorsalis_.
 
 
 # ##################################
