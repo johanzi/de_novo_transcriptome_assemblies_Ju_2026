@@ -2,13 +2,18 @@
 title: "Untitled"
 author: "Johan Zicola"
 output:
-  html_notebook:
-    toc: yes
   pdf_document:
     toc: yes
+    latex_engine: xelatex
   html_document:
     toc: yes
     df_print: paged
+  html_notebook:
+    toc: yes
+mainfont: Arial
+documentclass: article
+classoption: a4paper
+geometry: margin=1in
 ---
 
 ```{r setup, include=FALSE}
@@ -19,13 +24,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Di and Kathi proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
 
+Transcriptome assemblies of eight non-target insect species present in autumn rapeseed fields.
 
-
-Transcriptome assemblies of eight non-target insect species present in autumn rapeseed fields 
+The data are available on the BioProject PRJNA1218941 on NCBI (https://www.ncbi.nlm.nih.gov/).
 
 # Insect species
 
-Insects collected and identified by Di:
+Insects collected and identified by Di Ju:
 
 | library | species                  | basionym             | order       | NCBI taxonomy ID |
 |---------|--------------------------|----------------------|-------------|------------------|
@@ -47,7 +52,6 @@ The goal is to compare transcripts of different species and see if they are targ
 
 * Assemble the transcripts for each species
 * Get the full list of transcripts and the list of longest ORFs
-
 
 Off-target analysis done by the company:
 
@@ -75,28 +79,32 @@ Summary statistics for raw data:
 
 We have between 44 and 64 M paired-end reads.
 
-fastqc
+## Fastqc
 
 ```{bash, eval=FALSE}
+
+module load fastqc/0.12.1
+
 f *fq.gz > list_fastq.txt
 
-while read i; do srun --partition medium fastqc $i -o fastqc_reports/ & done < list_fastq.txt
+while read i; do 
+   srun --partition medium fastqc $i -o fastqc_reports/ & 
+done < list_fastq.txt
+
 ```
 
 
-# Pipeline
+![](images/GC_content.png)
 
-https://southgreenplatform.github.io/tutorials//bioanalysis/trinity/
+Aphidius rhopalosiphi (08_Ar, red arrow) shows a very low GC content (30%) compared to all other Coleopteran species (40%). This was reported (https://pmc.ncbi.nlm.nih.gov/articles/PMC5993429/):
 
-https://training.galaxyproject.org/topics/transcriptomics/tutorials/full-de-novo/tutorial.html
+> Among sequenced examples, hymenopteran genomes are moderate in size (80% are between 180–340Mb) with a few exceptions [10–12]. Most possess 12,000–20,000 genes (note counts are highly annotation-pipeline and assembly contiguity dependent[13]), with a relatively low content of repetitive and transposable elements. One unusual feature is low GC content, which ranges from 30–45% depending on the species[8]. Although the reason for low GC content is not yet understood, it may be related to GC-biased gene conversion and high recombination rates[14]. Due to their relatively small size and simple structure, Hymenopteran genomes are readily assembled and highly tractable for genome sequencing[15].
 
-* Trim data with cutadapt to remove adapters
+The adapter content profile was also different for Aphidius rhopalosiphi with the presence of the polyA (AAAAAAAAAAAA) (see in `fastqc/lib/Configuration/adapter_list.txt`).
 
 # Trimming
 
-Note that Trinity will skip reads of less than 25 bp so I can set the minimum size to 25 nt.
-
-Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
+Note that Trinity will skip reads of less than 25 bp so set the minimum size to 25 nt. Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
 
 ```{bash, eval=FALSE}
 
@@ -106,8 +114,8 @@ Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
 #SBATCH --nodes=1
 #SBATCH --ntasks=1 
 #SBATCH --mem=16000
-#SBATCH --output=slurm.%A.%a.out
-#SBATCH --error=slurm.%A.%a.err
+#SBATCH --output=slurm.%x.%A.%a.out
+#SBATCH --error=slurm.%x.%A.%a.err
 #SBATCH --partition=medium
 #SBATCH --time=02:00:00
 #SBATCH --constraint=scratch
@@ -115,13 +123,11 @@ Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
 #SBATCH --array=1-8
 
-
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
 echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 module load cutadapt/4.4
 
@@ -131,7 +137,7 @@ cut -d_ -f1-4 | sort | uniq | sed -n ${SLURM_ARRAY_TASK_ID}p)
 cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
     -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT \
     --quality-base 33 --max-n 0 --minimum-length 25 -o ${file_name}_1.trimmed.fq \
-    -p ${file_name}_2.trimmed.fq ${file_name}_1.fq.gz ${file_name}_2.fq.gz
+    -p ${file_name}_2.trimmed.fq ${file_name}_1.fq ${file_name}_2.fq
     
 ```
 
@@ -166,6 +172,96 @@ cut -f1,6 multiqc_general_stats.txt
 | 08_Ar_L1_2  | 43,759,260  |
 
 
+# Remove rRNA-mapping reads
+
+```{bash, eval=FALSE}
+module load rev/23.12 miniconda3/22.11.1
+
+conda create -n ribodetector python=3.8
+conda activate ribodetector
+
+# conda install -c bioconda ribodetector
+# Doesn't work
+
+pip install ribodetector
+# Worked
+
+ribodetector --version
+ribodetector 0.3.1
+
+# Doc recommends 20 Gb of RAM for PE data and 20 threads
+```
+
+Based on ribodetector manual (https://github.com/hzi-bifo/RiboDetector):
+> chunk_size * 1024 reads to load each time. When chunk_size=1000 and threads=20, consuming ~20G memory, better to be multiples of the number of threads.
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector
+#SBATCH --nodes=1
+#SBATCH --partition=medium
+#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=20
+#SBATCH --threads-per-core=1
+#SBATCH --mem=30gb
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=slurm/job-%x-%j.out
+#SBATCH --error=slurm/job-%x-%j.err
+
+echo "Starting at $(date)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
+
+module purge
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+ribodetector_cpu -t 20 \
+  -l 100 \
+  -i $INPUT_FASTQ_LEFT $INPUT_FASTQ_RIGHT \
+  -e rrna \
+  --chunk_size 1000 \
+  -o $OUTPUT_FASTQ_LEFT $OUTPUT_FASTQ_RIGHT
+
+```
+
+```{bash, eval=FALSE}
+
+while read i; do
+   sbatch --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_FASTQ_LEFT=trimmed_reads/rrna_removed/${i}_L1_1.trimmed.mRNA.fq,OUTPUT_FASTQ_RIGHT=trimmed_reads/rrna_removed/${i}_L1_2.trimmed.mRNA.fq 02_rRNA_removal.sh
+done < trimmed_reads/list.txt
+
+```
+
+
+| Sample      | raw        | after_trimming | after_rRNA_removal | % rRNA |
+|-------------|------------|----------------|--------------------|--------|
+| 01_Ad_L1_1  | 64,769,548 | 63,577,584     | 62,903,350         | 1.06%  |
+| 01_Ad_L1_2  | 64,769,548 | 63,577,584     | 62,903,350         | 1.06%  |
+| 02_Pm_L1_1  | 56,305,457 | 55,268,700     | 54,872,720         | 0.72%  |
+| 02_Pm_L1_2  | 56,305,457 | 55,268,700     | 54,872,720         | 0.72%  |
+| 03_Zt_L1_1  | 50,054,875 | 49,128,370     | 48,909,030         | 0.45%  |
+| 03_Zt_L1_2  | 50,054,875 | 49,128,370     | 48,909,030         | 0.45%  |
+| 04_Asp_L1_1 | 42,581,758 | 41,800,517     | 41,629,666         | 0.41%  |
+| 04_Asp_L1_2 | 42,581,758 | 41,800,517     | 41,629,666         | 0.41%  |
+| 05_G_L1_1   | 41,668,796 | 40,905,979     | 40,609,402         | 0.73%  |
+| 05_G_L1_2   | 41,668,796 | 40,905,979     | 40,609,402         | 0.73%  |
+| 06_Ol_L1_1  | 57,482,693 | 56,417,515     | 56,041,881         | 0.67%  |
+| 06_Ol_L1_2  | 57,482,693 | 56,417,515     | 56,041,881         | 0.67%  |
+| 07_Pr_L1_1  | 47,960,411 | 47,069,928     | 46,852,466         | 0.46%  |
+| 07_Pr_L1_2  | 47,960,411 | 47,069,928     | 46,852,466         | 0.46%  |
+| 08_Ar_L1_1  | 44,601,099 | 43,758,919     | 43,367,052         | 0.90%  |
+| 08_Ar_L1_2  | 44,601,099 | 43,758,919     | 43,367,052         | 0.90%  |
+
+Less than 1% of reads match rRNAs apart from 01_Ad (1%).
+
+
 # Trinity (v2.15.1)
 
 Use apptainer, the easiest solution to deal with all Trinity dependencies.
@@ -174,27 +270,26 @@ Use apptainer, the easiest solution to deal with all Trinity dependencies.
 #!/bin/bash
 #SBATCH --job-name=Trinity
 #SBATCH --nodes=1
-#SBATCH --time=12:00:00
+#SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=110gb
 #SBATCH --partition=medium
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=Trinity.%J.out
-#SBATCH --error=Trinity.%J.err
-
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+#SBATCH --output=slurm/job-%x.%j.out
+#SBATCH --error=slurm/job-%x.%j.err
 
 echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 module purge
 
 module load apptainer
 
-PATH_DIR="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
+PATH_DIR="/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects"
 
 apptainer exec --bind $PATH_DIR -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg  Trinity \
           --max_memory 100G \
@@ -212,183 +307,22 @@ Loop of over each sample:
 ```{bash, eval=FALSE}
 
 while read i; do
-  echo "sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh"
-  sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh
-done < list
+  sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/rrna_removed/${i}_L1_1.trimmed.mRNA.fq,INPUT_FASTQ_RIGHT=trimmed_reads/rrna_removed/${i}_L1_2.trimmed.mRNA.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity 03_trinity.sh
+done < trimmed_reads/list.txt
 
 ```
 
-
-```{bash, eval=FALSE}
-while read i; do seqkit stats $i; done <<<$(f *trinity.Trinity.fasta )
-file                                 format  type  num_seqs      sum_len  min_len  avg_len  max_len
-./02_Pm/02_Pm_trinity.Trinity.fasta  FASTA   DNA    140,145  116,247,368      177    829.5   26,406
-file                               format  type  num_seqs      sum_len  min_len  avg_len  max_len
-./05_G/05_G_trinity.Trinity.fasta  FASTA   DNA    104,390  100,387,029      177    961.7   25,018
-file                                 format  type  num_seqs     sum_len  min_len  avg_len  max_len
-./03_Zt/03_Zt_trinity.Trinity.fasta  FASTA   DNA     76,934  86,902,887      182  1,129.6   26,778
-file                                   format  type  num_seqs     sum_len  min_len  avg_len  max_len
-./04_Asp/04_Asp_trinity.Trinity.fasta  FASTA   DNA     72,481  82,598,703      174  1,139.6   24,631
-file                                 format  type  num_seqs      sum_len  min_len  avg_len  max_len
-./01_Ad/01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
-
-```
-
-
-
-## 01_Ad
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 4909774
-JobName: Trinity
-Submitted: 2025-01-09T11:00:42
-Started: 2025-01-09T11:01:32
-Ended: 2025-01-09T20:00:00
-Elapsed: 539 min, Limit: 2880 min, Difference: 2341 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 143.73 core-hours
-=======================================================
-```
-
-
-## 02_Pm
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037510
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-15T18:30:58
-Ended: 2025-01-16T05:29:00
-Elapsed: 659 min, Limit: 720 min, Difference: 61 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 175.73 core-hours
-=======================================================
-
-```
-
-## 03_Zt
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037511
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-15T18:33:29
-Ended: 2025-01-16T02:21:09
-Elapsed: 468 min, Limit: 720 min, Difference: 252 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 124.80 core-hours
-=======================================================
-```
-
-
-## 04_Asp
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037512
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-15T18:43:26
-Ended: 2025-01-16T01:05:36
-Elapsed: 383 min, Limit: 720 min, Difference: 337 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 102.13 core-hours
-=======================================================
-
-```
-
-
-## 05_G
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037513
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-16T01:05:50
-Ended: 2025-01-16T09:00:03
-Elapsed: 475 min, Limit: 720 min, Difference: 245 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 126.67 core-hours
-=======================================================
-```
-
-
-## 06_Ol
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037514
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-16T09:00:47
-Ended: 2025-01-16T16:55:44
-Elapsed: 475 min, Limit: 720 min, Difference: 245 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 126.67 core-hours
-=======================================================
-```
-
-## 07_Pr
+02_Pm and 08_Ar did not have time to finish within 12 hours, relaunch
 
 ```{bash, eval=FALSE}
 
-============ Job Information ==========================
-JobID: 5037515
-JobName: Trinity
-Submitted: 2025-01-15T18:04:04
-Started: 2025-01-16T09:51:54
-Ended: 2025-01-16T17:41:27
-Elapsed: 470 min, Limit: 720 min, Difference: 250 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 125.33 core-hours
-=======================================================
+echo -e "02_Pm\n08_Ar" > new_list.txt
+
+while read i; do
+  sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/rrna_removed/${i}_L1_1.trimmed.mRNA.fq,INPUT_FASTQ_RIGHT=trimmed_reads/rrna_removed/${i}_L1_2.trimmed.mRNA.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity 03_trinity.sh
+done < new_list.txt
+
 ```
-
-
-## 08_Ar
-
-Time out
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5037516
-JobName: Trinity
-Submitted: 2025-01-15T18:04:05
-Started: 2025-01-16T09:51:54
-Ended: 2025-01-16T21:52:17
-Elapsed: 721 min, Limit: 720 min, Difference: -1 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 192.27 core-hours
-=======================================================
-```
-
-Based on the forum, I can rerun Trinity command and it will start from the last completed checkpoint
-
-
-```{bash, eval=FALSE}
-i="08_Ar"
-sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/${i}_L1_1.trimmed.fq,INPUT_FASTQ_RIGHT=trimmed_reads/${i}_L1_2.trimmed.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity trinity_run.sh
-```
-
-
-```{bash, eval=FALSE}
-============ Job Information ==========================
-JobID: 5056408
-JobName: Trinity
-Submitted: 2025-01-17T08:47:18
-Started: 2025-01-17T08:47:24
-Ended: 2025-01-17T11:05:41
-Elapsed: 139 min, Limit: 720 min, Difference: 581 min
-CPUs: 8, Nodes: 1
-Estimated consumption: 37.07 core-hours
-=======================================================
-```
-
-Finished in 139 min for the remaining steps.
 
 
 # Summary assemblies
@@ -405,7 +339,6 @@ f *_trinity.Trinity.fasta -exec seqkit stats {} \; | grep -v "file"
 ./07_Pr/07_Pr_trinity.Trinity.fasta  FASTA   DNA     92,572  108,290,220      180  1,169.8   24,578
 ./01_Ad/01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
 
-
 ```
 
 
@@ -413,348 +346,326 @@ f *_trinity.Trinity.fasta -exec seqkit stats {} \; | grep -v "file"
 
 ```{bash, eval=FALSE}
 
-path_output="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output"
+path_output="/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output"
 
 module load apptainer
 
-apptainer exec --bind $path_output -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg /usr/local/bin/util/TrinityStats.pl 01_Ad/01_Ad_trinity.Trinity.fasta
+while read i; do
+   echo $i
+   apptainer exec --bind $path_output \
+   -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg \
+   /usr/local/bin/util/TrinityStats.pl ${path_output}/${i}/${i}_trinity.Trinity.fasta
+done < list_libraries.txt
+
 
 ```
 
-
-## 01_Ad
-
-```
-################################
-## Counts of transcripts, etc.
-################################
-Total trinity 'genes':  67047
-Total trinity transcripts:   103137
-Percent GC: 36.52
-
-########################################
-Stats based on ALL transcript contigs:
-########################################
-
-   Contig N10: 6347
-   Contig N20: 4615
-   Contig N30: 3602
-   Contig N40: 2835
-   Contig N50: 2225
-
-   Median contig length: 460
-   Average contig: 1071.33
-   Total assembled bases: 110493798
-
-
-#####################################################
-## Stats based on ONLY LONGEST ISOFORM per 'GENE':
-#####################################################
-
-   Contig N10: 5485
-   Contig N20: 3842
-   Contig N30: 2821
-   Contig N40: 2091
-   Contig N50: 1507
-
-   Median contig length: 348
-   Average contig: 751.81
-   Total assembled bases: 50406345
-
-```
-
-
-## 02_Pm
-
+## Amara_similata
 
 ```
 ################################
 ## Counts of transcripts, etc.
 ################################
-Total trinity 'genes':  94235
-Total trinity transcripts:   140145
-Percent GC: 36.70
-
-########################################
-Stats based on ALL transcript contigs:
-########################################
-
-   Contig N10: 5401
-   Contig N20: 3962
-   Contig N30: 2946
-   Contig N40: 2241
-   Contig N50: 1687
-
-   Median contig length: 372
-   Average contig: 829.48
-   Total assembled bases: 116247368
-
-
-#####################################################
-## Stats based on ONLY LONGEST ISOFORM per 'GENE':
-#####################################################
-
-   Contig N10: 4755
-   Contig N20: 3178
-   Contig N30: 2225
-   Contig N40: 1580
-   Contig N50: 1027
-
-   Median contig length: 318
-   Average contig: 620.79
-   Total assembled bases: 58500213
-
-```
-
-## 03_Zt
-
-```
-################################
-## Counts of transcripts, etc.
-################################
-Total trinity 'genes':  51952
-Total trinity transcripts:   76934
-Percent GC: 36.81
-
-########################################
-Stats based on ALL transcript contigs:
-########################################
-
-   Contig N10: 6342
-   Contig N20: 4654
-   Contig N30: 3615
-   Contig N40: 2885
-   Contig N50: 2285
-
-   Median contig length: 505
-   Average contig: 1129.58
-   Total assembled bases: 86902887
-
-
-#####################################################
-## Stats based on ONLY LONGEST ISOFORM per 'GENE':
-#####################################################
-
-   Contig N10: 5679
-   Contig N20: 3983
-   Contig N30: 3002
-   Contig N40: 2313
-   Contig N50: 1753
-
-   Median contig length: 377
-   Average contig: 837.57
-   Total assembled bases: 43513583
-
-```
-
-## 04_Asp
-
-```
-################################
-## Counts of transcripts, etc.
-################################
-Total trinity 'genes':  45431
-Total trinity transcripts:   72481
+Total trinity 'genes':  45378
+Total trinity transcripts:      72529
 Percent GC: 37.03
 
 ########################################
 Stats based on ALL transcript contigs:
 ########################################
 
-   Contig N10: 6191
-   Contig N20: 4539
-   Contig N30: 3567
-   Contig N40: 2817
-   Contig N50: 2233
+        Contig N10: 6269
+        Contig N20: 4545
+        Contig N30: 3577
+        Contig N40: 2819
+        Contig N50: 2233
 
-   Median contig length: 533
-   Average contig: 1139.59
-   Total assembled bases: 82598703
+        Median contig length: 533
+        Average contig: 1141.92
+        Total assembled bases: 82822303
 
 
 #####################################################
 ## Stats based on ONLY LONGEST ISOFORM per 'GENE':
 #####################################################
 
-   Contig N10: 5577
-   Contig N20: 3920
-   Contig N30: 2963
-   Contig N40: 2276
-   Contig N50: 1750
+        Contig N10: 5565
+        Contig N20: 3941
+        Contig N30: 2971
+        Contig N40: 2280
+        Contig N50: 1752
 
-   Median contig length: 390
-   Average contig: 862.61
-   Total assembled bases: 39189450
+        Median contig length: 388
+        Average contig: 862.32
+        Total assembled bases: 39130495
+
 
 ```
 
-## 05_G
+## Anchomenus_dorsalis
 
 ```
 ################################
 ## Counts of transcripts, etc.
 ################################
-Total trinity 'genes':  63019
-Total trinity transcripts:   104390
+Total trinity 'genes':  66955
+Total trinity transcripts:      102969
+Percent GC: 36.51
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+        Contig N10: 6380
+        Contig N20: 4629
+        Contig N30: 3600
+        Contig N40: 2838
+        Contig N50: 2227
+
+        Median contig length: 461
+        Average contig: 1073.07
+        Total assembled bases: 110492695
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+        Contig N10: 5492
+        Contig N20: 3840
+        Contig N30: 2823
+        Contig N40: 2094
+        Contig N50: 1507
+
+        Median contig length: 348
+        Average contig: 752.03
+        Total assembled bases: 50352161
+
+
+```
+
+
+## Aphidius_rhopalosiphi
+
+```
+
+```
+
+## Harpalus_affinis
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  62888
+Total trinity transcripts:      104141
 Percent GC: 36.59
 
 ########################################
 Stats based on ALL transcript contigs:
 ########################################
 
-   Contig N10: 5600
-   Contig N20: 3984
-   Contig N30: 3006
-   Contig N40: 2372
-   Contig N50: 1843
+        Contig N10: 5666
+        Contig N20: 3982
+        Contig N30: 3015
+        Contig N40: 2376
+        Contig N50: 1853
 
-   Median contig length: 453
-   Average contig: 961.65
-   Total assembled bases: 100387029
+        Median contig length: 455
+        Average contig: 966.33
+        Total assembled bases: 100634161
 
 
 #####################################################
 ## Stats based on ONLY LONGEST ISOFORM per 'GENE':
 #####################################################
 
-   Contig N10: 4898
-   Contig N20: 3317
-   Contig N30: 2445
-   Contig N40: 1830
-   Contig N50: 1357
+        Contig N10: 4889
+        Contig N20: 3314
+        Contig N30: 2442
+        Contig N40: 1835
+        Contig N50: 1360
 
-   Median contig length: 352
-   Average contig: 728.03
-   Total assembled bases: 45879553
+        Median contig length: 352
+        Average contig: 729.35
+        Total assembled bases: 45867434
+
 
 ```
 
-## 06_Ol
+## Harpalus_eous
 
 ```
 ################################
 ## Counts of transcripts, etc.
 ################################
-Total trinity 'genes':  64282
-Total trinity transcripts:   100481
-Percent GC: 35.70
+Total trinity 'genes':  64108
+Total trinity transcripts:      100318
+Percent GC: 35.67
 
 ########################################
 Stats based on ALL transcript contigs:
 ########################################
 
-   Contig N10: 5486
-   Contig N20: 3965
-   Contig N30: 3028
-   Contig N40: 2375
-   Contig N50: 1866
+        Contig N10: 5361
+        Contig N20: 3943
+        Contig N30: 3030
+        Contig N40: 2379
+        Contig N50: 1862
 
-   Median contig length: 447
-   Average contig: 959.27
-   Total assembled bases: 96388352
+        Median contig length: 447
+        Average contig: 959.71
+        Total assembled bases: 96276103
 
 
 #####################################################
 ## Stats based on ONLY LONGEST ISOFORM per 'GENE':
 #####################################################
 
-   Contig N10: 4825
-   Contig N20: 3342
-   Contig N30: 2471
-   Contig N40: 1872
-   Contig N50: 1369
+        Contig N10: 4791
+        Contig N20: 3351
+        Contig N30: 2475
+        Contig N40: 1871
+        Contig N50: 1376
 
-   Median contig length: 357
-   Average contig: 731.99
-   Total assembled bases: 47053619
+        Median contig length: 357
+        Average contig: 732.86
+        Total assembled bases: 46982078
+
 
 ```
 
-## 07_Pr
+
+## Poecilus_cupreus
 
 ```
 ################################
 ## Counts of transcripts, etc.
 ################################
-Total trinity 'genes':  56798
-Total trinity transcripts:   92572
+Total trinity 'genes':  56762
+Total trinity transcripts:      92510
 Percent GC: 37.40
 
 ########################################
 Stats based on ALL transcript contigs:
 ########################################
 
-   Contig N10: 6481
-   Contig N20: 4676
-   Contig N30: 3736
-   Contig N40: 2960
-   Contig N50: 2341
+        Contig N10: 6472
+        Contig N20: 4702
+        Contig N30: 3753
+        Contig N40: 2957
+        Contig N50: 2332
 
-   Median contig length: 538
-   Average contig: 1169.79
-   Total assembled bases: 108290220
+        Median contig length: 537
+        Average contig: 1170.43
+        Total assembled bases: 108276782
 
 
 #####################################################
 ## Stats based on ONLY LONGEST ISOFORM per 'GENE':
 #####################################################
 
-   Contig N10: 5761
-   Contig N20: 4107
-   Contig N30: 3008
-   Contig N40: 2283
-   Contig N50: 1693
+        Contig N10: 5745
+        Contig N20: 4124
+        Contig N30: 3014
+        Contig N40: 2282
+        Contig N50: 1698
 
-   Median contig length: 376
-   Average contig: 829.30
-   Total assembled bases: 47102779
+        Median contig length: 375
+        Average contig: 830.22
+        Total assembled bases: 47124764
+
+```
+
+## Pterostichus_melanarius
 
 
 ```
 
-## 08_Ar
+
+```
+
+## Zabrus_tenebrioides
 
 ```
 ################################
 ## Counts of transcripts, etc.
 ################################
-Total trinity 'genes':  202721
-Total trinity transcripts:   249888
-Percent GC: 27.13
+Total trinity 'genes':  51901
+Total trinity transcripts:      77027
+Percent GC: 36.83
 
 ########################################
 Stats based on ALL transcript contigs:
 ########################################
 
-   Contig N10: 3219
-   Contig N20: 2170
-   Contig N30: 1504
-   Contig N40: 986
-   Contig N50: 680
+        Contig N10: 6492
+        Contig N20: 4703
+        Contig N30: 3656
+        Contig N40: 2913
+        Contig N50: 2299
 
-   Median contig length: 350
-   Average contig: 564.43
-   Total assembled bases: 141043361
+        Median contig length: 502
+        Average contig: 1133.81
+        Total assembled bases: 87333709
 
 
 #####################################################
 ## Stats based on ONLY LONGEST ISOFORM per 'GENE':
 #####################################################
 
-   Contig N10: 2421
-   Contig N20: 1436
-   Contig N30: 897
-   Contig N40: 645
-   Contig N50: 507
+        Contig N10: 5734
+        Contig N20: 3986
+        Contig N30: 3017
+        Contig N40: 2312
+        Contig N50: 1751
 
-   Median contig length: 334
-   Average contig: 478.33
-   Total assembled bases: 96967451
+        Median contig length: 378
+        Average contig: 839.07
+        Total assembled bases: 43548326
 
 
 ```
 
+
+# Formatting for NCBI TSA
+
+NCBI accepts only contigs of minimum 200 nt for TSA (see doc https://www.ncbi.nlm.nih.gov/genbank/tsaguide/).
+
+```{bash, eval=FALSE}
+
+while read i; do
+   seqkit seq -G -m 200 ${i}_trinity.Trinity.fasta > ${i}_trinity.Trinity.min200nt.fasta
+done < list_libraries.txt
+
+```
+
+I have also to change the headers to fit NCBI standards. Now it looks like `>TRINITY_DN173756_c0_g1_i1 len=395 path=[0:0-394]`. The line should also contain `[moltype=transcribed_RNA]`. Based on this tutorial (https://www.amnh.org/research/staff-directory/robert-desalle/rna-seq-data-submission), it should be: `>contig_ID [organism=Genus species] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]`
+
+```{bash, eval=FALSE}
+
+seqkit replace -p "\s.+" -r ' [organism=Anchomenus dorsalis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Pterostichus melanarius] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Zabrus tenebrioides] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Amara similata [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' _trinity.Trinity.min200nt.fasta > Trinity_200nt_min_renamed.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Harpalus affinis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Poecilus cupreus] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+seqkit replace -p "\s.+" -r ' [organism=Aphidius rhopalosiphi] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+
+# Change extension
+rename ".fasta" ".fsa" *fasta
+
+```
+
 # Contamination removal
+
+Use webtool https://usegalaxy.org/.
 
 ## NCBI FCS GX
 
@@ -771,7 +682,7 @@ Get for each species the taxonomy id on https://www.ncbi.nlm.nih.gov/Taxonomy/Br
 
 Then use the NCBI FCS GX tool to detect contaminations (https://usegalaxy.org/)
 
-Rename the two output files with the name of the libaries.
+Rename the two output files with the name of the libraries.
 
 ```{bash, eval=FALSE}
 
@@ -794,115 +705,6 @@ done
 ```
 
 
-### Fungal presence
-
-```{bash, eval=FALSE}
-
-for i in *_Taxonomy_report.tabular; do 
-  echo -e "\n======$i"
-  awk '$9=="fung:fungi" {print $0}' $i | \
-  cut -f6,7 | sort | uniq -c | sort | sed 's/^\s*//' | \
-  awk '{print $2,$3,$1}'  | sort -k3nr | head
-done
-
-======01_Ad_Taxonomy_report.tabular
-Mucor circinelloides 454
-Mucor velutinosus 414
-Mucor lusitanicus 410
-Mucor irregularis 267
-Mucor racemosus 118
-Pilaira anomala 100
-Mucor plumbeus 90
-Thamnidium elegans 80
-Mucor piriformis 69
-Mucor mucedo 66
-
-======02_Pm_Taxonomy_report.tabular
-Mucor indicus 225
-Mucor circinelloides 82
-Gigaspora margarita 79
-Mucor racemosus 68
-Mucor lusitanicus 65
-Mucor velutinosus 62
-Choanephora cucurbitarum 56
-Mucor irregularis 56
-Massospora cicadina 54
-Gilbertella persicaria 53
-
-======03_Zt_Taxonomy_report.tabular
-Massospora cicadina 32
-Gigaspora margarita 25
-Entomophthora muscae 21
-Gigaspora rosea 21
-Mucor irregularis 16
-Diversispora epigaea 15
-Rhizophagus clarus 12
-Mucor lusitanicus 11
-Mucor mucedo 11
-Mucor racemosus 7
-
-======04_Asp_Taxonomy_report.tabular
-Massospora cicadina 32
-Gigaspora margarita 31
-Gigaspora rosea 28
-Diversispora epigaea 17
-Entomophthora muscae 15
-Mucor circinelloides 7
-Thamnidium elegans 7
-Mucor irregularis 6
-Geosiphon pyriformis 5
-Mucor lusitanicus 5
-
-======05_G_Taxonomy_report.tabular
-Gigaspora margarita 45
-Massospora cicadina 41
-Gigaspora rosea 30
-Entomophthora muscae 23
-Diversispora epigaea 22
-Rhizophagus clarus 12
-Geosiphon pyriformis 9
-Mucor irregularis 9
-Rhizophagus irregularis 8
-Cunninghamella bertholletiae 6
-
-======06_Ol_Taxonomy_report.tabular
-Mucor irregularis 60
-Gigaspora margarita 40
-Massospora cicadina 36
-Gigaspora rosea 33
-Entomophthora muscae 28
-Mucor racemosus 28
-Mucor circinelloides 25
-Mucor mucedo 22
-Mucor lusitanicus 21
-Thamnidium elegans 20
-
-======07_Pr_Taxonomy_report.tabular
-Gigaspora margarita 41
-Massospora cicadina 38
-Entomophthora muscae 19
-Rhizophagus clarus 18
-Gigaspora rosea 17
-Diversispora epigaea 15
-Mucor piriformis 9
-Linnemannia elongata 7
-Podila humilis 6
-Rhizophagus irregularis 6
-
-======08_Ar_Taxonomy_report.tabular
-Neoconidiobolus thromboides 35
-Massospora cicadina 17
-Gigaspora margarita 14
-Gigaspora rosea 10
-Entomophthora muscae 8
-Cunninghamella blakesleeana 5
-Rhizophagus irregularis 5
-Backusella circina 4
-Diversispora epigaea 4
-Halteromyces radiatus 4
-
-```
-
 
 
 ## NCBI FCS adaptor
@@ -920,7 +722,8 @@ The software use this list of sequence: https://ftp.ncbi.nlm.nih.gov/pub/UniVec/
 unzip '67_ Adaptor_reports.zip'
 
 # Replace spaces by underscore
-find . -depth -name '*' | while IFS= read -r f ; do mv -i "$f" "$(dirname "$f")/$(basename "$f"|tr ':' )" ; done
+find . -depth -name '*' | while IFS= read -r f ; \
+do mv -i "$f" "$(dirname "$f")/$(basename "$f"|tr ':' )" ; done
 
 # Remove colons
 find . -name "*:*" -exec rename ':' '' {} \;
@@ -929,9 +732,7 @@ find . -name "*:*" -exec rename ':' '' {} \;
 
  rename 'NCBI_FCS_Adaptor_on_data_' '' *tabular
 
-
 # Rename each file manually to replace Dataset number by library names
-
 
 # Check number of transcri
 for i in *tabular; do echo $i; grep -v -n "^#accession" $i | wc -l; done
@@ -953,7 +754,9 @@ NCBI_FCS_Adaptor_on_data_08_Ar_Adaptor_report.tabular
 9
 
 # Check most abundant adapter type
-cat *.tabular | cut -f5 | sort | uniq -c | sed 's/^\s*//' | awk '{print $2,$1}'  | sort -k2nr | grep -v "^name"
+cat *.tabular | cut -f5 | sort | uniq -c | sed 's/^\s*//' | \
+   awk '{print $2,$1}'  | sort -k2nr | grep -v "^name"
+   
 CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01114.1:Illumina 12
 CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00201.1:NotI 2
 CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00749.1:Illumina 1
@@ -1002,7 +805,8 @@ wc -l *_contaminants.txt
 
 while read i; do
   seqkit grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt \
-  trinity_output/${i}/${i}_trinity.Trinity.fasta > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta
+  trinity_output/${i}/${i}_trinity.Trinity.fasta \
+  > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta
 done < list.txt
 
 [INFO] 3452 patterns loaded from file
@@ -1022,7 +826,9 @@ Also fix the gene_trans_map
 # Important to use -w, otherwise, partial match will remove transcripts
 # that are not in the contamination list!
 while read i; do
-  grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt trinity_output/${i}/${i}_trinity.Trinity.fasta.gene_trans_map > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta.gene_trans_map
+  grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt \
+  trinity_output/${i}/${i}_trinity.Trinity.fasta.gene_trans_map \
+  > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta.gene_trans_map
 done < list.txt
 
 ```
@@ -1031,7 +837,7 @@ Gather final files
 
 ```{bash, eval=FALSE}
 
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output
+cd /scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output
 
 find . -type f -name *cleaned.fasta -exec cp {} summary/ \;
 
@@ -1096,7 +902,10 @@ Zabrus_tenebrioides_trinity.fasta      FASTA   DNA     76,576   86,687,902      
 Number of genes:
 
 ```{bash, eval=FALSE}
-for i in *gene_trans_map; do echo $(echo "$i" | cut -d_ -f1,2); cut -f1 $i| sort | uniq | wc -l; done
+for i in *gene_trans_map; do 
+   echo $(echo "$i" | cut -d_ -f1,2); cut -f1 $i| sort | uniq | wc -l
+done
+
 Amara_similata
 45382
 Anchomenus_dorsalis
@@ -1128,7 +937,6 @@ Zabrus_tenebrioides
 | Zabrus_tenebrioides     | 51,663   |
 
 
-
 ## Summary contamination
 
 | library | species                 | Transcripts w/ conta | Transcripts w/o conta | diff1 | Genes w/ conta | Genes w/o conta | diff2 |
@@ -1141,6 +949,8 @@ Zabrus_tenebrioides
 | 06_Ol   | Harpalus_eous           | 100,481              | 99,814                | 667   | 64,282         | 63,803          | 479   |
 | 07_Pr   | Poecilus_cupreus        | 92,572               | 92,372                | 200   | 56,798         | 56,672          | 126   |
 | 08_Ar   | Aphidius_rhopalosiphi   | 249,888              | 248,746               | 1,142 | 202,721        | 201,906         | 815   |
+
+
 
 
 
@@ -1163,15 +973,14 @@ Reuse script used for OPM analysis. Transdecoder needs a different output folder
 #SBATCH --error=TransDecoder.%J.err
 #SBATCH --array=1-8
 
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
 echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
-output_folder="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output"
-trinity_folder="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary"
+output_folder="transdecoder_output"
+trinity_folder="trinity_output/summary"
 
 file_name=$(sed -n ${SLURM_ARRAY_TASK_ID}p ${trinity_folder}/library_to_species.txt | cut -f2)
 mkdir ${output_folder}/${file_name}
@@ -1186,8 +995,6 @@ mkdir ${output_folder}/${file_name}
     --output_dir ${output_folder}/${file_name}
 
 ```
-
-
 
 # Trinotate apptainer
 
@@ -1204,19 +1011,15 @@ Run TmHMM and SignalPv6 separately: https://github.com/Trinotate/Trinotate/wiki/
 
 > Certain software tools such as those provided by DTU Health Tech have restricted licensing that prevent distribution, and so these cannot be included in our Docker or Singularity images and must be obtained/installed separately by users. These, in particular, include both TmHMM and SignalP utilities. While these can be installed natively and automatically run by Trinotate, they cannot be automatically run via the Docker/Singularity images. Instructions below provide for execution and loading of the results into the Trinotate sqlite database.
 
-
 Version of signalp6 and tmhmm used:
 
 ```{bash, eval=FALSE}
-
 signalp6 --version
 SignalP 6.0 Signal peptide prediction tool 6.0h
 
 which tmhmm
 ~/bin/tmhmm-2.0c/bin/tmhmm
-
 ```
-
 
 ## Download manually eggnog.db.gz
 
@@ -1240,7 +1043,6 @@ gunzip *
 
 
 ## 04_trinotate.sh
-
 
 First steps are in apptainer:
 - Create database
@@ -1290,14 +1092,13 @@ $TRINOTATE_HOME/Trinotate \
 
 ```
 
-Remember to make the shell script executable.
+Make the shell script executable.
 
 ```{bash, eval=FALSE}
 chmod +x 04_trinotate.sh
 ```
 
-
-### sbatch_04_trinotate.sh
+## sbatch_04_trinotate.sh
 
 ```{bash, eval=FALSE}
 #!/bin/bash
@@ -1312,12 +1113,11 @@ chmod +x 04_trinotate.sh
 #SBATCH --output=job-%x-%j.out
 #SBATCH --error=job-%x-%j.err
 
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
 echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 # Modules to load
 module purge
@@ -1340,20 +1140,6 @@ sbatch --export=SPECIES="Amara_similata" sbatch_trinotate.sh
 ```
 
 Works, now, all Trinotate output will go in `~/newhome` instead of `$HOME`.
-
-```{bash, eval=FALSE}
-ll ~/newhome/
-total 51M
-drwxr-x---  3 zicola UANP    6 Jan 27 19:36 ./
-drwx------ 63 zicola UANP 9.3K Jan 27 19:33 ../
--rw-r-----  1 zicola UANP  20M Jan 27 19:40 TrinotatePFAM.out
--rw-r-----  1 zicola UANP    0 Jan 27 19:36 __init.ok
-drwxr-x---  2 zicola UANP    0 Jan 27 19:36 __trinotate_run_checkpts/
--rw-r-----  1 zicola UANP  22M Jan 27 19:40 pfam.log
--rw-r-----  1 zicola UANP 1.6M Jan 27 19:36 uniprot_sprot.diamond.blastp.outfmt6
--rw-r-----  1 zicola UANP 1.6M Jan 27 19:36 uniprot_sprot.diamond.blastx.outfmt6
-```
-
 
 ```{bash, eval=FALSE}
 sacct -j JOBID -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
@@ -1415,12 +1201,11 @@ Second step:
 #SBATCH --output=job-%x-%j.out
 #SBATCH --error=job-%x-%j.err
 
-mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
-
 echo "Starting at $(date)"
-echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
-echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
-echo "I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 # Modules to load
 module purge
@@ -1486,9 +1271,7 @@ echo "###########################"
 apptainer exec -C -B /usr/users/zicola -B $WORKPATH -B $TRINOTATE_DATA_DIR -e ~/bin/trinotate.v4.0.2.simg \
    $TRINOTATE_HOME/Trinotate \
    --db ${SQLITE_DB} \
-   --report \
-   --incl_pep \
-   --incl_trans > ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report.tsv
+   --report > ${WORKPATH}/trinotate_output/${SPECIES}/Trinotate_report.tsv
 
 # Take about 10 min
 
@@ -1608,13 +1391,22 @@ sbatch --export=SPECIES="Anchomenus_dorsalis" 05_trinotate.sh
 sbatch --export=SPECIES="Poecilus_cupreus" 05_trinotate.sh
 
 sbatch --export=SPECIES="Amara_similata" 05_trinotate.sh
-# Done
-
 
 sbatch --export=SPECIES="Aphidius_rhopalosiphi" 05_trinotate.sh
 
 ```
 
+## Gather annotations
+
+```{bash, eval=FALSE}
+
+find . -name "Trinotate_report.tsv" -exec gzip {} \;
+
+while read i; do
+   cp ${i}/Trinotate_report.tsv.gz summary_trinotate/${i}_Trinotate_report.tsv.gz
+done < list_species.txt
+
+```
 
 # BUSCO
 
@@ -1623,9 +1415,7 @@ Based on the odb10 list (`busco --list-datasets`), there are no coleoptera datab
 See doc on https://busco.ezlab.org/busco_userguide.html#running-busco
 
 ```{bash, eval=FALSE}
-
 busco --list-datasets
-
 ```
 
 
@@ -1682,7 +1472,6 @@ Zabrus_tenebrioides_trinity.fasta.transdecoder.pep      FASTA   Protein    34,67
 ```
 
 
-
 ## Run BUSCO
 
 ```{bash, eval=FALSE}
@@ -1696,6 +1485,12 @@ Zabrus_tenebrioides_trinity.fasta.transdecoder.pep      FASTA   Protein    34,67
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
 #SBATCH --output=busco.%J.out
 #SBATCH --error=busco.%J.err
+
+echo "Starting at $(date)"
+echo "Cluster: $SLURM_CLUSTER_NAME"
+echo "Job name: $SLURM_JOB_NAME"
+echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
+echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 module load busco/5.4.3
 
@@ -1716,7 +1511,6 @@ sbatch --export=TRINITY_FILE=longest_isoforms/Pterostichus_melanarius_trinity.lo
 
 ```
 
-
 ## Separate run for Aphidius_rhopalosiphi
 
 Do a second run for Aphidius which is a hymenoptera
@@ -1727,7 +1521,6 @@ hymenoptera_odb10
 srun --time=00:20:00 --cpus-per-task=8 --mem=8G -p medium busco -i longest_isoforms/Aphidius_rhopalosiphi_trinity.longest_isoforms.fasta -m transcriptome --lineage_dataset hymenoptera_odb10 --cpu 8 --out busco_output/Aphidius_rhopalosiphi_hymenoptera_odb10 &
 
 ```
-
 
 
 ## Summarize BUSCO results
@@ -1844,11 +1637,9 @@ figure <- ggplot() +
 
 figure
 
-
 ```
 
 Using the hymenoptera database for _Aphidium rhopalosiphi_ yields to lower completedness than while using insecta database. It can be due to the fact that we use only the adult stage and that only a subset of genes are expressed in the adult analyzed. 
-
 
 Without hymenoptera analysis
 
@@ -1979,6 +1770,11 @@ Use Doga's script (https://figshare.com/articles/dataset/_i_in_silico_i_off-targ
 
 
 Di mentioned that to verify if we have the correct species, one needs to look at the cytochrome oxidase subunit 1 (COI) sequence.
+
+
+The gene is encoded within the Mt so we can't expect to have the transcript in our assemblies (polyA enrichment).
+
+Di used DNA + PCR (see paper https://bdj.pensoft.net/article/117014/)
 
 01_Ad
 Anchomenus dorsalis (NCBI taxonomy ID 586010)

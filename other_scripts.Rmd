@@ -13,7 +13,6 @@ https://training.galaxyproject.org/topics/transcriptomics/tutorials/full-de-novo
 
 * Trim data with cutadapt to remove adapters
 
-
 # Remove empty reads
 
 ```{bash, eval=FALSE}
@@ -998,6 +997,7 @@ Sat Feb  1 13:55:20 2025
 
 ```
 
+The RAM of the GPU is 16 Gb (16384 Mb)
 
 
 Use default parameter of ribodetect
@@ -1045,6 +1045,8 @@ ribodetector --threads 10 \
 #SBATCH -o job-%x-%j.out
 #SBATCH -e job-%x-%j.err
 
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
 echo "Starting at $(date)"
 echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
 echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
@@ -1066,6 +1068,69 @@ ribodetector --threads 10 \
   --output reads.gpu.nonrrna.1.fq reads.gpu.nonrrna.2.fq
 
 ```
+
+```{bash, eval=FALSE}
+$ cat job-ribodetector_gpu-5638529.err
+2025-02-04 21:16:35 : INFO  Using high MCC model
+2025-02-04 21:16:35 : INFO  Log file: None
+2025-02-04 21:16:50 : INFO  Model using cuda for read length 100 loaded
+2025-02-04 21:16:53 : INFO  Choose batch size: 8192 based on the given GPU RAM size 12GB and max read length 100
+slurmstepd: error: *** JOB 5638529 ON agq013 CANCELLED AT 2025-02-04T23:16:09 DUE TO TIME LIMIT ***
+slurmstepd: error: Detected 2 oom_kill events in StepId=5638529.batch. Some of the step tasks have been OOM Killed.
+
+sa 5638529
+JobID           JobName  AllocCPUS     ReqMem     MaxRSS  Timelimit    Elapsed      State
+------------ ---------- ---------- ---------- ---------- ---------- ---------- ----------
+5638529      ribodetec+         10        15G              02:00:00   02:00:02    TIMEOUT
+5638529.bat+      batch         10                15.00G              02:00:04 OUT_OF_ME+
+5638529.ext+     extern         10                 0.00G              02:00:04  COMPLETED
+
+
+```
+
+
+Add extra RAM (30Gb) and add --mem-per-gpu=15G
+
+`sbatch: fatal: --mem, --mem-per-cpu, and --mem-per-gpu are mutually exclusive.`
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#SBATCH --job-name=ribodetector_gpu
+#SBATCH --threads-per-core=1
+#SBATCH -p gpu
+#SBATCH -G 1
+#SBATCH --gres=gpu:1
+#SBATCH --mem=30G
+#SBATCH --cpus-per-task=10
+#SBATCH -o job-%x-%j.out
+#SBATCH -e job-%x-%j.err
+
+mem_gbytes=$(( $SLURM_MEM_PER_NODE/1024 ))
+
+echo "Starting at $(date)"
+echo "Job submitted to the ${SLURM_JOB_PARTITION} partition, the default partition on ${SLURM_CLUSTER_NAME}"
+echo "Job name: ${SLURM_JOB_NAME}, Job ID: ${SLURM_JOB_ID}"
+echo "  I have ${SLURM_CPUS_ON_NODE} CPUs and ${mem_gbytes}GiB of RAM on compute node $(hostname)"
+echo "Submitting job with sbatch from directory: ${SLURM_SUBMIT_DIR}"
+
+module load anaconda3/2021.05
+
+source activate ribodetector
+
+# Load cuda, otherwise, error message  ERROR  No visible CUDA devices! from ribodetector
+module load cuda/12.1.1
+
+ribodetector --threads 10 \
+  --len 100 \
+  --input 01_Ad_L1_1.trimmed.min25.fq 01_Ad_L1_2.trimmed.min25.fq \
+  --memory 12 \
+  --ensure rrna \
+  --output reads.gpu.nonrrna.1.fq reads.gpu.nonrrna.2.fq
+```
+
+
+Still not done after 4 hours. Kill the job.
 
 
 
@@ -1095,8 +1160,53 @@ Start run Sat Feb  1 14:01:37 CET 2025
 The screen was killed and there were not output files.
 
 
-# Trinity
 
+# Trinity w/o rRNA
+
+```{bash, eval=FALSE}
+sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/test_sortmerna/reads.nonrrna.1.fq,INPUT_FASTQ_RIGHT=trimmed_reads/test_sortmerna/reads.nonrrna.2.fq,OUTPUT_DIR=trinity_output/01_Ad_wo_rRNA/01_Ad_trinity 02_trinity.sh
+
+```
+
+```{bash, eval=FALSE}
+============ Job Information ==========================
+JobID: 5675836
+JobName: Trinity
+Submitted: 2025-02-06T16:48:17
+Started: 2025-02-06T17:17:32
+Ended: 2025-02-07T02:50:02
+Elapsed: 573 min, Limit: 720 min, Difference: 147 min
+CPUs: 8, Nodes: 1
+Estimated consumption: 152.80 core-hours
+=======================================================
+
+```
+
+
+```{bash, eval=FALSE}
+# Without rRNA
+seqkit stats 01_Ad_trinity.Trinity.fasta
+file                         format  type  num_seqs      sum_len  min_len  avg_len  max_len
+01_Ad_trinity.Trinity.fasta  FASTA   DNA    102,969  110,492,695      185  1,073.1   24,547
+
+cut -f1 01_Ad_trinity.Trinity.fasta.gene_trans_map |sort |uniq |wc -l
+66955
+
+
+# With rRNA
+seqkit stats 01_Ad_trinity.Trinity.fasta
+file                         format  type  num_seqs      sum_len  min_len  avg_len  max_len
+01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
+
+cut -f1 01_Ad_trinity.Trinity.fasta.gene_trans_map |sort |uniq |wc -l
+67047
+
+```
+
+168 extra transcripts and 92 extra genes when rRNAs are not removed.
+
+
+# Trinity with rRNA
 
 ## 01_Ad
 
@@ -1253,6 +1363,350 @@ Estimated consumption: 37.07 core-hours
 Finished in 139 min for the remaining steps.
 
 
+
+# Quality check TrinityStats
+
+```{bash, eval=FALSE}
+
+path_output="/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output"
+
+module load apptainer
+
+apptainer exec --bind $path_output -e /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg /usr/local/bin/util/TrinityStats.pl 01_Ad/01_Ad_trinity.Trinity.fasta
+
+```
+
+## Amara_similata
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  45431
+Total trinity transcripts:   72481
+Percent GC: 37.03
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6191
+   Contig N20: 4539
+   Contig N30: 3567
+   Contig N40: 2817
+   Contig N50: 2233
+
+   Median contig length: 533
+   Average contig: 1139.59
+   Total assembled bases: 82598703
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5577
+   Contig N20: 3920
+   Contig N30: 2963
+   Contig N40: 2276
+   Contig N50: 1750
+
+   Median contig length: 390
+   Average contig: 862.61
+   Total assembled bases: 39189450
+
+```
+
+## Anchomenus_dorsalis
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  67047
+Total trinity transcripts:   103137
+Percent GC: 36.52
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6347
+   Contig N20: 4615
+   Contig N30: 3602
+   Contig N40: 2835
+   Contig N50: 2225
+
+   Median contig length: 460
+   Average contig: 1071.33
+   Total assembled bases: 110493798
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5485
+   Contig N20: 3842
+   Contig N30: 2821
+   Contig N40: 2091
+   Contig N50: 1507
+
+   Median contig length: 348
+   Average contig: 751.81
+   Total assembled bases: 50406345
+
+```
+
+## Aphidius_rhopalosiphi
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  202721
+Total trinity transcripts:   249888
+Percent GC: 27.13
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 3219
+   Contig N20: 2170
+   Contig N30: 1504
+   Contig N40: 986
+   Contig N50: 680
+
+   Median contig length: 350
+   Average contig: 564.43
+   Total assembled bases: 141043361
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 2421
+   Contig N20: 1436
+   Contig N30: 897
+   Contig N40: 645
+   Contig N50: 507
+
+   Median contig length: 334
+   Average contig: 478.33
+   Total assembled bases: 96967451
+```
+
+## Harpalus_affinis
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  63019
+Total trinity transcripts:   104390
+Percent GC: 36.59
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5600
+   Contig N20: 3984
+   Contig N30: 3006
+   Contig N40: 2372
+   Contig N50: 1843
+
+   Median contig length: 453
+   Average contig: 961.65
+   Total assembled bases: 100387029
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4898
+   Contig N20: 3317
+   Contig N30: 2445
+   Contig N40: 1830
+   Contig N50: 1357
+
+   Median contig length: 352
+   Average contig: 728.03
+   Total assembled bases: 45879553
+
+```
+
+## Harpalus_eous
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  64282
+Total trinity transcripts:   100481
+Percent GC: 35.70
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5486
+   Contig N20: 3965
+   Contig N30: 3028
+   Contig N40: 2375
+   Contig N50: 1866
+
+   Median contig length: 447
+   Average contig: 959.27
+   Total assembled bases: 96388352
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4825
+   Contig N20: 3342
+   Contig N30: 2471
+   Contig N40: 1872
+   Contig N50: 1369
+
+   Median contig length: 357
+   Average contig: 731.99
+   Total assembled bases: 47053619
+
+```
+
+
+## Poecilus_cupreus
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  56798
+Total trinity transcripts:   92572
+Percent GC: 37.40
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6481
+   Contig N20: 4676
+   Contig N30: 3736
+   Contig N40: 2960
+   Contig N50: 2341
+
+   Median contig length: 538
+   Average contig: 1169.79
+   Total assembled bases: 108290220
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5761
+   Contig N20: 4107
+   Contig N30: 3008
+   Contig N40: 2283
+   Contig N50: 1693
+
+   Median contig length: 376
+   Average contig: 829.30
+   Total assembled bases: 47102779
+```
+
+## Pterostichus_melanarius
+
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  94235
+Total trinity transcripts:   140145
+Percent GC: 36.70
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 5401
+   Contig N20: 3962
+   Contig N30: 2946
+   Contig N40: 2241
+   Contig N50: 1687
+
+   Median contig length: 372
+   Average contig: 829.48
+   Total assembled bases: 116247368
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 4755
+   Contig N20: 3178
+   Contig N30: 2225
+   Contig N40: 1580
+   Contig N50: 1027
+
+   Median contig length: 318
+   Average contig: 620.79
+   Total assembled bases: 58500213
+
+```
+
+## Zabrus_tenebrioides
+
+```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes':  51952
+Total trinity transcripts:   76934
+Percent GC: 36.81
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+   Contig N10: 6342
+   Contig N20: 4654
+   Contig N30: 3615
+   Contig N40: 2885
+   Contig N50: 2285
+
+   Median contig length: 505
+   Average contig: 1129.58
+   Total assembled bases: 86902887
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+   Contig N10: 5679
+   Contig N20: 3983
+   Contig N30: 3002
+   Contig N40: 2313
+   Contig N50: 1753
+
+   Median contig length: 377
+   Average contig: 837.57
+   Total assembled bases: 43513583
+
+```
+
+
+
+
 # Fungal presence
 
 ```{bash, eval=FALSE}
@@ -1367,6 +1821,8 @@ Halteromyces radiatus 4
 # Trinotate
 
 Wiki: https://github.com/Trinotate/Trinotate/wiki/Software-installation-and-data-required
+
+Pipeline https://perun.biochem.dal.ca/manuals/trinityrnaseq_r2013-02-25/annotation/Trinotate.html
 
 Reuse script used for OPM analysis.
 
