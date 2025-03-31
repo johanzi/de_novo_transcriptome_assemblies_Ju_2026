@@ -1,15 +1,21 @@
 ---
-title: "Untitled"
+title: "Transcriptome assemblies of eight non-target insect species present in autumn
+  rapeseed fields"
 author: "Johan Zicola"
 output:
-  pdf_document:
-    toc: yes
-    latex_engine: xelatex
-  html_document:
-    toc: yes
-    df_print: paged
   html_notebook:
-    toc: yes
+    toc: true
+  word_document:
+    toc: true
+  html_document:
+    toc: true
+    df_print: paged
+  github_document:
+    toc: true
+    df_print: paged
+  pdf_document:
+    toc: true
+    latex_engine: xelatex
 mainfont: Arial
 documentclass: article
 classoption: a4paper
@@ -20,45 +26,41 @@ geometry: margin=1in
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # Objective
 
-Di and Kathi proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
+Di Ju and Katharina Ziese-Kubon proceeded to the RNA extraction and mRNA-seq library preparation of 8 different insect species. The libraries were sequenced in 100+100 PE mode by BGI.
 
-Transcriptome assemblies of eight non-target insect species present in autumn rapeseed fields.
+Transcriptome assemblies of eight non-target insect species present in autumn rapeseed fields (post-harvest).
 
 The data are available on the BioProject PRJNA1218941 on NCBI (https://www.ncbi.nlm.nih.gov/).
 
 # Insect species
 
-Insects collected and identified by Di Ju:
+Insects collected or purchased and identified by Di Ju and Bernd Ulber:
 
-| library | species                  | basionym             | order       | NCBI taxonomy ID |
-|---------|--------------------------|----------------------|-------------|------------------|
-| 01_Ad   | Anchomenus dorsalis      |                      | Coleoptera  | 586010           |
-| 02_Pm   | Pterostichus melanarius  |                      | Coleoptera  | 60768            |
-| 03_Zt   | Zabrus tenebrioides      | Carabus tenebrioides | Coleoptera  | 272042           |
-| 04_Asp  | Amara similata           | Harpalus similatus   | Coleoptera  | 272013           |
-| 05_G    | Harpalus affinis         |                      | Coleoptera  | 247283           |
-| 06_Ol   | Harpalus eous            |                      | Coleoptera  | 2107211          |
-| 07_Pr   | Poecilus cupreus         | Pterostichus cupreus | Coleoptera  | 270614           |
-| 08_Ar   | Aphidius rhopalosiphi    |                      | Hymenoptera | 55891            |
+| library | species                   | NCBI taxonomy ID | Source                                   |
+|---------|---------------------------|------------------|------------------------------------------|
+| 01_Ad   | Anchomenus dorsalis       | 586010           | Rapeseed   field Goettingen (Germany)    |
+| 02_Pm   | Pterostichus   melanarius | 60768            | Rapeseed field Goettingen (Germany)      |
+| 03_Zt   | Zabrus tenebrioides       | 272042           | Rapeseed   field Goettingen (Germany)    |
+| 04_Asp  | Amara similata            | 272013           | Rapeseed field Goettingen (Germany)      |
+| 05_G    | Harpalus affinis          | 247283           | Rapeseed   field Goettingen (Germany)    |
+| 06_Ol   | Harpalus eous             | 2107211          | Rapeseed field Goettingen (Germany)      |
+| 07_Pr   | Poecilus cupreus          | 270614           | Katz   Biotech AG (Germany)              |
+| 08_Ar   | Aphidius   rhopalosiphi   | 55891            | Bio-Test Labor GmbH Sagerheide (Germany) |
 
 + morphology and species attributes: https://www.gbif.org/species/search?q=
 + Full taxonomy: https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi
 
 Besides Aphidius rhopalosiphi (parasitic wasp, Hymenoptera), all other 7 species are Coleoptera.
 
-The goal is to compare transcripts of different species and see if they are targeted by the designed dsRNAs used to kill the CSFB.
+Two specimens (_Anchomenus dorsalis_ and _Harpalus affinis_) could not be identified with certainty at the species levels and were therefore genotyped. We used the mitochondrial gene cytochrome _c_ oxidase I (COI), commonly used as a DNA barcode for insect taxonomy. DNA was extracted (kit) and amplified by PCR using the primer LCO1490 (GGTCAACAAATCATAAAGATATTGG) and HCO2198 (TAAACTTCAGGGTGACCAAAAAATCA) ([Hebert et al. 2003](https://royalsocietypublishing.org/doi/10.1098/rspb.2002.2218)). The PCR products were purified (kit) and sent for Sanger sequencing. Sequences were compared with annotated COI sequences from NCBI (see below) using Omega Clustal alignment tool (https://www.ebi.ac.uk/jdispatcher/msa/clustalo?stype=dna). Complete match between the sequences confirmed the identity of the two specimens.
 
-* Assemble the transcripts for each species
-* Get the full list of transcripts and the list of longest ORFs
+Reference cytochrome _c_ oxidase I (COI) sequences used for comparison:
 
-Off-target analysis done by the company:
-
-* Map the designed dsRNAs (50 or so designed) to these transcripts with allowed mismatches (do 0, 1, and 2)
-* Get a list of candidate target transcripts
-
-Check Cedden 2024 (https://resjournals.onlinelibrary.wiley.com/doi/10.1111/imb.12942) for the dsRNA design and off-target analysis. He developped an online tool to design dsRNAs (https://dsrip.uni-goettingen.de/efficiency).
+- _Anchomenus dorsalis_ (NCBI taxonomy ID 586010) https://www.ncbi.nlm.nih.gov/nuccore/HQ953549.1
+- _Harpalus affinis_ (NCBI taxonomy ID 247283) https://www.ncbi.nlm.nih.gov/nuccore/OK638137.1
 
 # Data
 
@@ -96,15 +98,17 @@ done < list_fastq.txt
 
 ![](images/GC_content.png)
 
-Aphidius rhopalosiphi (08_Ar, red arrow) shows a very low GC content (30%) compared to all other Coleopteran species (40%). This was reported (https://pmc.ncbi.nlm.nih.gov/articles/PMC5993429/):
+_Aphidius rhopalosiphi_ (08_Ar, red arrow) shows a very low GC content (30%) compared to all other Coleopteran species (40%). This was reported (https://pmc.ncbi.nlm.nih.gov/articles/PMC5993429/):
 
 > Among sequenced examples, hymenopteran genomes are moderate in size (80% are between 180–340Mb) with a few exceptions [10–12]. Most possess 12,000–20,000 genes (note counts are highly annotation-pipeline and assembly contiguity dependent[13]), with a relatively low content of repetitive and transposable elements. One unusual feature is low GC content, which ranges from 30–45% depending on the species[8]. Although the reason for low GC content is not yet understood, it may be related to GC-biased gene conversion and high recombination rates[14]. Due to their relatively small size and simple structure, Hymenopteran genomes are readily assembled and highly tractable for genome sequencing[15].
 
-The adapter content profile was also different for Aphidius rhopalosiphi with the presence of the polyA (AAAAAAAAAAAA) (see in `fastqc/lib/Configuration/adapter_list.txt`).
+The adapter content profile was also different for _Aphidius rhopalosiphi_ with the presence of the polyA (AAAAAAAAAAAA) (see in `fastqc/lib/Configuration/adapter_list.txt`). Signal perhaps related to the low GC content?
 
 # Trimming
 
 Note that Trinity will skip reads of less than 25 bp so set the minimum size to 25 nt. Remove 3' adapters from read 1 and read 2 and trim by quality, allowing no Ns.
+
+## 01_trimming_cutadapt.sh
 
 ```{bash, eval=FALSE}
 
@@ -114,13 +118,13 @@ Note that Trinity will skip reads of less than 25 bp so set the minimum size to 
 #SBATCH --nodes=1
 #SBATCH --ntasks=1 
 #SBATCH --mem=16000
-#SBATCH --output=slurm.%x.%A.%a.out
-#SBATCH --error=slurm.%x.%A.%a.err
 #SBATCH --partition=medium
 #SBATCH --time=02:00:00
 #SBATCH --constraint=scratch
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --output=slurm/job.%x.%A.%a.out
+#SBATCH --error=slurm/job.%x.%A.%a.err
 #SBATCH --array=1-8
 
 echo "Starting at $(date)"
@@ -140,8 +144,6 @@ cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
     -p ${file_name}_2.trimmed.fq ${file_name}_1.fq ${file_name}_2.fq
     
 ```
-
-The Ar sample shows a polyA adaptor contamination that is gradual from the beginning to the end of the read. It also contains a lower GC content than all other samples. Ar (Aphidius rhopalosiphi) is the only Hymenoptera among the 8 species (all others are Coleptera) so it may explain why it differs in GC content.
 
 Number of reads after trimming:
 
@@ -196,6 +198,8 @@ Based on ribodetector manual (https://github.com/hzi-bifo/RiboDetector):
 > chunk_size * 1024 reads to load each time. When chunk_size=1000 and threads=20, consuming ~20G memory, better to be multiples of the number of threads.
 
 
+## 02_rRNA_removal.sh
+
 ```{bash, eval=FALSE}
 #!/bin/bash
 #SBATCH --job-name=ribodetector
@@ -207,8 +211,8 @@ Based on ribodetector manual (https://github.com/hzi-bifo/RiboDetector):
 #SBATCH --mem=30gb
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=slurm/job-%x-%j.out
-#SBATCH --error=slurm/job-%x-%j.err
+#SBATCH --output=slurm/job.%x.%j.out
+#SBATCH --error=slurm/job.%x.%j.err
 
 echo "Starting at $(date)"
 echo "Cluster: $SLURM_CLUSTER_NAME"
@@ -262,9 +266,13 @@ done < trimmed_reads/list.txt
 Less than 1% of reads match rRNAs apart from 01_Ad (1%).
 
 
-# Trinity (v2.15.1)
+# Trinity 
 
 Use apptainer, the easiest solution to deal with all Trinity dependencies.
+
+Download container file of version v2.15.1 on https://github.com/trinityrnaseq/trinityrnaseq/releases.
+
+## 03_trinity.sh
 
 ```{bash, eval=FALSE}
 #!/bin/bash
@@ -276,8 +284,8 @@ Use apptainer, the easiest solution to deal with all Trinity dependencies.
 #SBATCH --partition=medium
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=slurm/job-%x.%j.out
-#SBATCH --error=slurm/job-%x.%j.err
+#SBATCH --output=slurm/job.%x.%j.out
+#SBATCH --error=slurm/job.%x.%j.err
 
 echo "Starting at $(date)"
 echo "Cluster: $SLURM_CLUSTER_NAME"
@@ -312,34 +320,6 @@ done < trimmed_reads/list.txt
 
 ```
 
-02_Pm and 08_Ar did not have time to finish within 12 hours, relaunch
-
-```{bash, eval=FALSE}
-
-echo -e "02_Pm\n08_Ar" > new_list.txt
-
-while read i; do
-  sbatch  --export=INPUT_FASTQ_LEFT=trimmed_reads/rrna_removed/${i}_L1_1.trimmed.mRNA.fq,INPUT_FASTQ_RIGHT=trimmed_reads/rrna_removed/${i}_L1_2.trimmed.mRNA.fq,OUTPUT_DIR=trinity_output/${i}/${i}_trinity 03_trinity.sh
-done < new_list.txt
-
-```
-
-
-# Summary assemblies
-
-```{bash, eval=FALSE}
-
-f *_trinity.Trinity.fasta -exec seqkit stats {} \; | grep -v "file"
-./02_Pm/02_Pm_trinity.Trinity.fasta  FASTA   DNA    140,145  116,247,368      177    829.5   26,406
-./05_G/05_G_trinity.Trinity.fasta  FASTA   DNA    104,390  100,387,029      177    961.7   25,018
-./03_Zt/03_Zt_trinity.Trinity.fasta  FASTA   DNA     76,934  86,902,887      182  1,129.6   26,778
-./04_Asp/04_Asp_trinity.Trinity.fasta  FASTA   DNA     72,481  82,598,703      174  1,139.6   24,631
-./06_Ol/06_Ol_trinity.Trinity.fasta  FASTA   DNA    100,481  96,388,352      178    959.3   20,450
-./08_Ar/08_Ar_trinity.Trinity.fasta  FASTA   DNA    249,888  141,043,361      188    564.4   35,915
-./07_Pr/07_Pr_trinity.Trinity.fasta  FASTA   DNA     92,572  108,290,220      180  1,169.8   24,578
-./01_Ad/01_Ad_trinity.Trinity.fasta  FASTA   DNA    103,137  110,493,798      184  1,071.3   33,453
-
-```
 
 
 # Quality check TrinityStats
@@ -448,6 +428,42 @@ Stats based on ALL transcript contigs:
 ## Aphidius_rhopalosiphi
 
 ```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes': 202451
+Total trinity transcripts: 249345
+Percent GC: 27.08
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+        Contig N10: 3212
+        Contig N20: 2154
+        Contig N30: 1502
+        Contig N40: 986
+        Contig N50: 681
+
+        Median contig length: 350
+        Average contig: 564.02
+        Total assembled bases: 140636468
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+        Contig N10: 2433
+        Contig N20: 1443
+        Contig N30: 899
+        Contig N40: 646
+        Contig N50: 508
+
+        Median contig length: 334
+        Average contig: 478.90
+        Total assembled bases: 96953299
+
 
 ```
 
@@ -581,6 +597,41 @@ Stats based on ALL transcript contigs:
 
 
 ```
+################################
+## Counts of transcripts, etc.
+################################
+Total trinity 'genes': 94211
+Total trinity transcripts: 140181
+Percent GC: 36.70
+
+########################################
+Stats based on ALL transcript contigs:
+########################################
+
+        Contig N10: 5443
+        Contig N20: 3948
+        Contig N30: 2945
+        Contig N40: 2242
+        Contig N50: 1693
+
+        Median contig length: 373
+        Average contig: 830.65
+        Total assembled bases: 116440725
+
+
+#####################################################
+## Stats based on ONLY LONGEST ISOFORM per 'GENE':
+#####################################################
+
+        Contig N10: 4734
+        Contig N20: 3162
+        Contig N30: 2224
+        Contig N40: 1590
+        Contig N50: 1028
+
+        Median contig length: 317
+        Average contig: 620.64
+        Total assembled bases: 58470956
 
 
 ```
@@ -635,7 +686,9 @@ NCBI accepts only contigs of minimum 200 nt for TSA (see doc https://www.ncbi.nl
 ```{bash, eval=FALSE}
 
 while read i; do
-   seqkit seq -G -m 200 ${i}_trinity.Trinity.fasta > ${i}_trinity.Trinity.min200nt.fasta
+  if [ -e trinity_output/${i}/${i}_trinity.Trinity.fasta ]; then
+   seqkit seq -g -m 200 trinity_output/${i}/${i}_trinity.Trinity.fasta > trinity_output/${i}/${i}_trinity.Trinity.min200nt.fasta
+  fi
 done < list_libraries.txt
 
 ```
@@ -644,28 +697,108 @@ I have also to change the headers to fit NCBI standards. Now it looks like `>TRI
 
 ```{bash, eval=FALSE}
 
-seqkit replace -p "\s.+" -r ' [organism=Anchomenus dorsalis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Anchomenus dorsalis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 01_Ad_trinity.Trinity.min200nt.fasta > 01_Ad_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Pterostichus melanarius] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Pterostichus melanarius] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 02_Pm_trinity.Trinity.min200nt.fasta > 02_Pm_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Zabrus tenebrioides] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Zabrus tenebrioides] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 03_Zt_trinity.Trinity.min200nt.fasta > 03_Zt_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Amara similata [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' _trinity.Trinity.min200nt.fasta > Trinity_200nt_min_renamed.fasta
+seqkit replace -p "\s.+" -r ' [organism=Amara similata] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 04_Asp_trinity.Trinity.min200nt.fasta > 04_Asp_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Harpalus affinis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Harpalus affinis] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 05_G_trinity.Trinity.min200nt.fasta > 05_G_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Poecilus cupreus] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Harpalus eous] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 06_Ol_trinity.Trinity.min200nt.fasta > 06_Ol_trinity.Trinity.min200nt.renamed.fasta
 
-seqkit replace -p "\s.+" -r ' [organism=Aphidius rhopalosiphi] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' Trinity_200nt_min.fasta > _trinity.Trinity.min200nt.fasta
+seqkit replace -p "\s.+" -r ' [organism=Poecilus cupreus] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 07_Pr_trinity.Trinity.min200nt.fasta > 07_Pr_trinity.Trinity.min200nt.renamed.fasta
 
-# Change extension
-rename ".fasta" ".fsa" *fasta
+seqkit replace -p "\s.+" -r ' [organism=Aphidius rhopalosiphi] [bioproject=PRJNA1218941] [moltype=transcribed_RNA] [tech=TSA]' 08_Ar_trinity.Trinity.min200nt.fasta > 08_Ar_trinity.Trinity.min200nt.renamed.fasta
 
 ```
 
+```{bash, eval=FALSE}
+ find . -maxdepth 2 -name "*renamed.fasta" -exec cp {} summary \;
+```
+
+```{bash, eval=FALSE}
+seqkit stats *fasta
+```
+
+Summary of the transcripts identified after filtering out transcripts smaller than 200 nt.
+
+| library | species                 | num_seqs | sum_len     | min_len | avg_len  | max_len |
+|---------|-------------------------|----------|-------------|---------|----------|---------|
+| 01_Ad   | Anchomenus_dorsalis     | 102,952  | 110,489,413 | 200     | 1,073.20 | 24,547  |
+| 02_Pm   | Pterostichus_melanarius | 140,161  | 116,436,859 | 200     | 830.7    | 27,130  |
+| 03_Zt   | Zabrus_tenebrioides     | 77,021   | 87,332,570  | 200     | 1,133.90 | 26,859  |
+| 04_Asp  | Amara_similata          | 72,520   | 82,820,550  | 200     | 1,142.00 | 24,479  |
+| 05_G    | Harpalus_affinis        | 104,120  | 100,630,123 | 200     | 966.5    | 17,003  |
+| 06_Ol   | Harpalus_eous           | 100,293  | 96,271,379  | 200     | 959.9    | 20,264  |
+| 07_Pr   | Poecilus_cupreus        | 92,500   | 108,274,871 | 201     | 1,170.50 | 24,576  |
+| 08_Ar   | Aphidius_rhopalosiphi   | 249,328  | 140,633,209 | 200     | 564      | 32,612  |
+
+_Aphidius rhopalosiphi_ has more than twice the number of transcripts compared to all seven other species.
+
 # Contamination removal
 
-Use webtool https://usegalaxy.org/.
+Upload fasta files on https://usegalaxy.org/.
+
+## NCBI FCS adaptor
+
+The software use this list of sequence: https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec
+
+Transcripts with recognized adaptor sequences will be trimmed.
+
++ In Galaxy, select the output files Adaptor report => Build Dataset List
++ Download the list of cleaned fasta files and contamination reports
++ Note which dataset number matches to which annotation
++ Replace spaces by underscore and remove colons.
+
+```{bash, eval=FALSE}
+# Check that all files contain transcripts of a least 200 nt
+
+seqkit stats *fasta
+processed files:  8 / 8 [======================================] ETA: 0s. done
+file                                                       format  type  num_seqs      sum_len  min_len  avg_len  max_len
+01_Ad_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA    102,952  110,489,413      200  1,073.2   24,547
+02_Pm_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA    140,161  116,436,813      200    830.7   27,130
+03_Zt_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA     77,020   87,332,319      200  1,133.9   26,859
+04_Asp_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta  FASTA   DNA     72,520   82,820,550      200    1,142   24,479
+05_G_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta    FASTA   DNA    104,120  100,629,987      200    966.5   17,003
+06_Ol_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA    100,292   96,271,117      200    959.9   20,264
+07_Pr_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA     92,500  108,274,871      201  1,170.5   24,576
+08_Ar_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta   FASTA   DNA    249,325  140,632,336      200    564.1   32,612
+
+
+# All files have a header that received the prefix lcl|
+# Remove it
+for i in *fasta; do
+  sed -i 's/^>lcl|/>/g'  $i
+done
+
+```
+
+Summary of the type of adaptor contamination:
+
+```{bash, eval=FALSE}
+
+cat *.tabular | cut -f5 | sort | uniq -c | sed 's/^\s*//' | \
+>    awk '{print $2,$1}'  | sort -k2nr | grep -v "^name"
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01114.1:Illumina 12
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00201.1:NotI 2
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00749.1:Illumina 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00751.1:Illumina 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00846.1:NEBNext 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00972.1:Pacific 1
+CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01094.1:Rubicon 1
+
+```
+
+Note from NCBI:
+> Note that mismatches between the name of the adaptor/primer identified in the screen
+and the sequencing technology used to generate the sequencing data should not be used
+to discount the validity of the screen results as the adaptors/primers of many
+different sequencing platforms share sequence similarity.
+
 
 ## NCBI FCS GX
 
@@ -680,133 +813,26 @@ Get for each species the taxonomy id on https://www.ncbi.nlm.nih.gov/Taxonomy/Br
 + Poecilus cupreus (=Pterostichus cupreus) (NCBI taxonomy ID 270614)
 + Aphidius rhopalosiphi (NCBI taxonomy ID 55891)
 
-Then use the NCBI FCS GX tool to detect contaminations (https://usegalaxy.org/)
+Then use the NCBI FCS GX tool to detect contaminations (https://usegalaxy.org/) (mode `Screen genome`).
+For taxonomy entry, choose `NCBI Taxonomic identifier` and enter NCBI taxonomy ID and species binomial name (given above).
 
-Rename the two output files with the name of the libraries.
 
 ```{bash, eval=FALSE}
+cat list.txt
+01_Ad
+02_Pm
+03_Zt
+04_Asp
+05_G
+06_Ol
+07_Pr
+08_Ar
 
-for i in *Action_report.tabular; do
-  sample=$(echo "$i" | cut -d_ -f1-2)
-  echo "grep "^TRINITY_" $i | cut -f1 | sort | uniq > ${sample}_list_contamination.txt"
-  grep "^TRINITY_" $i | cut -f1 | sort | uniq > ${sample}_list_contamination.txt
-done
-
- wc -l *list_contamination.txt
-  3452 01_Ad_list_contamination.txt
-  2053 02_Pm_list_contamination.txt
-   356 03_Zt_list_contamination.txt
-    57 04_Asp_list_contamination.txt
-   397 05_G_list_contamination.txt
-   667 06_Ol_list_contamination.txt
-   200 07_Pr_list_contamination.txt
-  1133 08_Ar_list_contamination.txt
-  8315 total
-```
-
-
-
-
-## NCBI FCS adaptor
-
-Download Galaxy file and replace spaces by underscore and remove colons.
-
-+ In Galaxy, select the output files Adaptor report => Build Dataset List
-+ Download the list of files
-+ Note which dataset number matches to which annotation
-
-The software use this list of sequence: https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec
-
-```{bash, eval=FALSE}
-
-unzip '67_ Adaptor_reports.zip'
-
-# Replace spaces by underscore
-find . -depth -name '*' | while IFS= read -r f ; \
-do mv -i "$f" "$(dirname "$f")/$(basename "$f"|tr ':' )" ; done
-
-# Remove colons
-find . -name "*:*" -exec rename ':' '' {} \;
-
-# Remove prefix NCBI_FCS_Adaptor_on_data_
-
- rename 'NCBI_FCS_Adaptor_on_data_' '' *tabular
-
-# Rename each file manually to replace Dataset number by library names
-
-# Check number of transcri
-for i in *tabular; do echo $i; grep -v -n "^#accession" $i | wc -l; done
-NCBI_FCS_Adaptor_on_data_01_Ad_Adaptor_report.tabular
-0
-NCBI_FCS_Adaptor_on_data_02_Pm_Adaptor_report.tabular
-3
-NCBI_FCS_Adaptor_on_data_03_Zt_Adaptor_report.tabular
-2
-NCBI_FCS_Adaptor_on_data_04_Asp_Adaptor_report.tabular
-0
-NCBI_FCS_Adaptor_on_data_05_G_Adaptor_report.tabular
-4
-NCBI_FCS_Adaptor_on_data_06_Ol_Adaptor_report.tabular
-1
-NCBI_FCS_Adaptor_on_data_07_Pr_Adaptor_report.tabular
-0
-NCBI_FCS_Adaptor_on_data_08_Ar_Adaptor_report.tabular
-9
-
-# Check most abundant adapter type
-cat *.tabular | cut -f5 | sort | uniq -c | sed 's/^\s*//' | \
-   awk '{print $2,$1}'  | sort -k2nr | grep -v "^name"
-   
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01114.1:Illumina 12
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00201.1:NotI 2
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00749.1:Illumina 1
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00754.1:Illumina 1
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00846.1:NEBNext 1
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB00972.1:Pacific 1
-CONTAMINATION_SOURCE_TYPE_ADAPTOR:NGB01094.1:Rubicon 1
-
-```
-
-14 transcripts with Illumina adaptors.
-
-Keep only transcript ID:
-
-```{bash, eval=FALSE}
-for i in *tabular; do 
-  grep -v "^#" $i | cut -f1 > ${i%.*}.clean.tabular
-done
-```
-
-
-## Remove contaminated transcripts
-
-Combine contaminated transcripts with adaptors and other species and cleanup fasta and map files
-
-```{bash, eval=FALSE}
 
 while read i; do
-cat fcs_adaptor_reports/${i}_Adaptor_report.clean.tabular \
-  fcs_gx_reports/${i}_list_contamination.txt | sort | uniq > ${i}_contaminants.txt
-done < list.txt
-
-wc -l *_contaminants.txt
-  3452 01_Ad_contaminants.txt
-  2056 02_Pm_contaminants.txt
-   358 03_Zt_contaminants.txt
-    57 04_Asp_contaminants.txt
-   401 05_G_contaminants.txt
-   667 06_Ol_contaminants.txt
-   200 07_Pr_contaminants.txt
-  1142 08_Ar_contaminants.txt
-
-```
-
-```{bash, eval=FALSE}
-
-while read i; do
-  seqkit grep -w -v -f ncbi_fcs_gx_adaptor/${i}_contaminants.txt \
-  trinity_output/${i}/${i}_trinity.Trinity.fasta \
-  > trinity_output/${i}/${i}_trinity.Trinity.cleaned.fasta
+  seqkit grep -v -f fcs_gx/${i}_list_contamination.txt \
+  cleaned_fasta_adaptors/${i}_trinity.Trinity.min200nt.renamed.wo_adaptors.fasta \
+  > cleaned_fasta_adaptors/cleaned_fcs_gx/${i}_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta
 done < list.txt
 
 [INFO] 3452 patterns loaded from file
@@ -817,6 +843,50 @@ done < list.txt
 [INFO] 667 patterns loaded from file
 [INFO] 200 patterns loaded from file
 [INFO] 1142 patterns loaded from file
+
+```
+
+```{bash, eval=FALSE}
+seqkit stats *fasta
+processed files:  8 / 8 [======================================] ETA: 0s. done
+file                                                              format  type  num_seqs      sum_len  min_len  avg_len  max_len
+01_Ad_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA     99,759  108,933,093      200    1,092   24,547
+02_Pm_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA    138,264  115,465,274      200    835.1   27,130
+03_Zt_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA     76,684   87,137,802      200  1,136.3   26,859
+04_Asp_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta  FASTA   DNA     72,479   82,797,453      200  1,142.4   24,479
+05_G_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta    FASTA   DNA    103,789  100,505,129      200    968.4   17,003
+06_Ol_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA     99,778   96,074,727      200    962.9   20,264
+07_Pr_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA     92,411  108,210,117      201    1,171   24,576
+08_Ar_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta   FASTA   DNA    248,641  140,390,403      200    564.6   32,612
+
+```
+
+Rename with insect species
+
+```{bash, eval=FALSE}
+
+cat library_to_species.txt
+01_Ad Anchomenus_dorsalis
+02_Pm Pterostichus_melanarius
+03_Zt Zabrus_tenebrioides
+04_Asp  Amara_similata
+05_G  Harpalus_affinis
+06_Ol Harpalus_eous
+07_Pr Poecilus_cupreus
+08_Ar Aphidius_rhopalosiphi
+
+
+while read i; do
+  library=$(echo "$i" | cut -f1)
+  species=$(echo "$i" | cut -f2)
+  echo "rename $library $species *fasta*"
+  rename $library $species *fasta*
+done < library_to_species.txt
+
+# Remove the .Trinity.cleaned.
+rename '.Trinity.cleaned' '' *fasta*
+
+seqkit stats *fasta
 
 ```
 
@@ -864,40 +934,28 @@ while read i; do
   library=$(echo "$i" | cut -f1)
   species=$(echo "$i" | cut -f2)
   echo "rename $library $species *fasta*"
-  rename $library $species *fasta*
+  cp ${library}_trinity.Trinity.min200nt.renamed.wo_adaptors.fcs_gx.fasta renamed_fasta/${species}.fasta
 done < library_to_species.txt
 
+# Create a new .gene_trans_map files (sorted gene id and transcript id)
+cd renamed_fasta
 
-# Remove the .Trinity.cleaned.
-rename '.Trinity.cleaned' '' *fasta*
+module load samtools 
 
-seqkit stats *fasta
-processed files:  8 / 8 [======================================] ETA: 0s. done
-file                                   format  type  num_seqs      sum_len  min_len  avg_len  max_len
-Amara_similata_trinity.fasta           FASTA   DNA     72,424   82,575,412      174  1,140.2   24,631
-Anchomenus_dorsalis_trinity.fasta      FASTA   DNA     99,685  108,787,099      184  1,091.3   33,453
-Aphidius_rhopalosiphi_trinity.fasta    FASTA   DNA    248,746  140,588,291      188    565.2   35,915
-Harpalus_affinis_trinity.fasta         FASTA   DNA    103,989  100,209,791      177    963.7   25,018
-Harpalus_eous_trinity.fasta            FASTA   DNA     99,814   96,095,807      178    962.7   20,450
-Poecilus_cupreus_trinity.fasta         FASTA   DNA     92,372  108,133,517      180  1,170.6   24,578
-Pterostichus_melanarius_trinity.fasta  FASTA   DNA    138,089  115,188,695      177    834.2   26,406
-Zabrus_tenebrioides_trinity.fasta      FASTA   DNA     76,576   86,687,902      182  1,132.1   26,778
+for i in *fasta; do
+ samtools faidx $i
+done
 
+for i in *fai; do
+  cut -f1 $i | cut -f1 > transcript_id
+  cut -f1 $i | cut -d_ -f1-4 > gene_id
+  paste gene_id transcript_id > ${i%.*}.gene_trans_map
+  rm transcript_id gene_id
+done
+
+rm *fai
 
 ```
-
-| file                                  | format | type | num_seqs | sum_len     | min_len | avg_len  | max_len |
-|---------------------------------------|--------|------|----------|-------------|---------|----------|---------|
-| Amara_similata_trinity.fasta          | FASTA  | DNA  | 72,424   | 82,575,412  | 174     | 1,140.20 | 24,631  |
-| Anchomenus_dorsalis_trinity.fasta     | FASTA  | DNA  | 99,685   | 108,787,099 | 184     | 1,091.30 | 33,453  |
-| Aphidius_rhopalosiphi_trinity.fasta   | FASTA  | DNA  | 248,746  | 140,588,291 | 188     | 565.2    | 35,915  |
-| Harpalus_affinis_trinity.fasta        | FASTA  | DNA  | 103,989  | 100,209,791 | 177     | 963.7    | 25,018  |
-| Harpalus_eous_trinity.fasta           | FASTA  | DNA  | 99,814   | 96,095,807  | 178     | 962.7    | 20,450  |
-| Poecilus_cupreus_trinity.fasta        | FASTA  | DNA  | 92,372   | 108,133,517 | 180     | 1,170.60 | 24,578  |
-| Pterostichus_melanarius_trinity.fasta | FASTA  | DNA  | 138,089  | 115,188,695 | 177     | 834.2    | 26,406  |
-| Zabrus_tenebrioides_trinity.fasta     | FASTA  | DNA  | 76,576   | 86,687,902  | 182     | 1,132.10 | 26,778  |
-
-
 
 Number of genes:
 
@@ -906,57 +964,31 @@ for i in *gene_trans_map; do
    echo $(echo "$i" | cut -d_ -f1,2); cut -f1 $i| sort | uniq | wc -l
 done
 
-Amara_similata
-45382
-Anchomenus_dorsalis
-64702
-Aphidius_rhopalosiphi
-201906
-Harpalus_affinis
-62673
-Harpalus_eous
-63803
-Poecilus_cupreus
-56672
-Pterostichus_melanarius
-92836
-Zabrus_tenebrioides
-51663
+Amara_similata.fasta.gene
+45345
+Anchomenus_dorsalis.fasta.gene
+64737
+Aphidius_rhopalosiphi.fasta.gene
+201829
+Harpalus_affinis.fasta.gene
+62580
+Harpalus_eous.fasta.gene
+63701
+Poecilus_cupreus.fasta.gene
+56682
+Pterostichus_melanarius.fasta.gene
+92886
+Zabrus_tenebrioides.fasta.gene
+51634
 
 ```
-
-| species                 | nb_genes |
-|-------------------------|----------|
-| Amara_similata          | 45,382   |
-| Anchomenus_dorsalis     | 64,702   |
-| Aphidius_rhopalosiphi   | 201,906  |
-| Harpalus_affinis        | 62,673   |
-| Harpalus_eous           | 63,803   |
-| Poecilus_cupreus        | 56,672   |
-| Pterostichus_melanarius | 92,836   |
-| Zabrus_tenebrioides     | 51,663   |
-
-
-## Summary contamination
-
-| library | species                 | Transcripts w/ conta | Transcripts w/o conta | diff1 | Genes w/ conta | Genes w/o conta | diff2 |
-|---------|-------------------------|----------------------|-----------------------|-------|----------------|-----------------|-------|
-| 01_Ad   | Anchomenus_dorsalis     | 103,137              | 99,685                | 3,452 | 67,047         | 64,702          | 2,345 |
-| 02_Pm   | Pterostichus_melanarius | 140,145              | 138,089               | 2,056 | 94,235         | 92,835          | 1,400 |
-| 03_Zt   | Zabrus_tenebrioides     | 76,934               | 76,576                | 358   | 51,952         | 51,663          | 289   |
-| 04_Asp  | Amara_similata          | 72,481               | 72,424                | 57    | 45,431         | 45,382          | 49    |
-| 05_G    | Harpalus_affinis        | 104,390              | 103,989               | 401   | 63,019         | 62,673          | 346   |
-| 06_Ol   | Harpalus_eous           | 100,481              | 99,814                | 667   | 64,282         | 63,803          | 479   |
-| 07_Pr   | Poecilus_cupreus        | 92,572               | 92,372                | 200   | 56,798         | 56,672          | 126   |
-| 08_Ar   | Aphidius_rhopalosiphi   | 249,888              | 248,746               | 1,142 | 202,721        | 201,906         | 815   |
-
-
-
 
 
 # Transdecoder
 
 Reuse script used for OPM analysis. Transdecoder needs a different output folder for each file, otherwise, it will override files of other instances.
+
+## 04_transdecoder.sh
 
 ```{bash, eval=FALSE}
 
@@ -969,8 +1001,8 @@ Reuse script used for OPM analysis. Transdecoder needs a different output folder
 #SBATCH --mem=20gb
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=TransDecoder.%J.out
-#SBATCH --error=TransDecoder.%J.err
+#SBATCH --output=slurm/job.%x.%J.out
+#SBATCH --error=slurm/job.%x.%J.err
 #SBATCH --array=1-8
 
 echo "Starting at $(date)"
@@ -979,24 +1011,26 @@ echo "Job name: $SLURM_JOB_NAME"
 echo "Number of CPUs: $SLURM_CPUS_ON_NODE"
 echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
-output_folder="transdecoder_output"
-trinity_folder="trinity_output/summary"
-
-file_name=$(sed -n ${SLURM_ARRAY_TASK_ID}p ${trinity_folder}/library_to_species.txt | cut -f2)
-mkdir ${output_folder}/${file_name}
+file_name=$(sed -n ${SLURM_ARRAY_TASK_ID}p list_species.txt)
+mkdir transdecoder_output/${file_name}
 
 ~/bin/TransDecoder-TransDecoder-v5.7.0/TransDecoder.LongOrfs \
-    --gene_trans_map ${trinity_folder}/${file_name}_trinity.fasta.gene_trans_map \
-    -t ${trinity_folder}/${file_name}_trinity.fasta \
-    --output_dir ${output_folder}/${file_name} 
-    && \
-    ~/bin/TransDecoder-TransDecoder-v5.7.0/TransDecoder.Predict \
-    -t ${trinity_folder}/${file_name}_trinity.fasta \
-    --output_dir ${output_folder}/${file_name}
+    --gene_trans_map trinity_output/${file_name}.fasta.gene_trans_map \
+    -t trinity_output/${file_name}.fasta \
+    --output_dir transdecoder_output/${file_name} && \
+~/bin/TransDecoder-TransDecoder-v5.7.0/TransDecoder.Predict \
+    -t trinity_output/${file_name}.fasta \
+    --output_dir transdecoder_output/${file_name}
 
 ```
 
-# Trinotate apptainer
+```{bash, eval=FALSE}
+sbatch 04_transdecoder.sh
+```
+
+
+
+# Trinotate
 
 https://southgreenplatform.github.io/trainings/trinityTrinotate/TP-annotation/
 
@@ -1042,7 +1076,7 @@ gunzip *
 ```
 
 
-## 04_trinotate.sh
+## 05_trinotate.sh
 
 First steps are in apptainer:
 - Create database
@@ -1059,14 +1093,20 @@ export TRINOTATE_HOME=/usr/local/src/Trinotate
 
 # Path to Trinity and Transdecoder files
 export WORKPATH=/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
-export GENE_TRANS_MAP=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta.gene_trans_map
-export TRINITY_FASTA=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta
-export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}_trinity.fasta.transdecoder.pep 
+export GENE_TRANS_MAP=${WORKPATH}/trinity_output/${SPECIES}.fasta.gene_trans_map
+export TRINITY_FASTA=${WORKPATH}/trinity_output/${SPECIES}.fasta
+export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}.fasta.transdecoder.pep 
 
 # Database
 export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
 export EGGNOG_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR
 export SQLITE_DB=${WORKPATH}/trinotate_output/${SPECIES}/database_${SPECIES}.sqlite
+
+
+# Create output directory if not existing
+if [ ! -d  ${WORKPATH}/trinotate_output/${SPECIES} ]; then
+  mkdir ${WORKPATH}/trinotate_output/${SPECIES}
+fi
 
 # Move to home before launching Trinotate
 cd $HOME
@@ -1095,14 +1135,14 @@ $TRINOTATE_HOME/Trinotate \
 Make the shell script executable.
 
 ```{bash, eval=FALSE}
-chmod +x 04_trinotate.sh
+chmod +x 05_trinotate.sh
 ```
 
-## sbatch_04_trinotate.sh
+## sbatch_05_trinotate.sh
 
 ```{bash, eval=FALSE}
 #!/bin/bash
-#SBATCH --job-name=04_trinotate
+#SBATCH --job-name=05_trinotate
 #SBATCH --nodes=1
 #SBATCH --partition=medium
 #SBATCH --time=48:00:00
@@ -1110,8 +1150,8 @@ chmod +x 04_trinotate.sh
 #SBATCH --mem=12G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=job-%x-%j.out
-#SBATCH --error=job-%x-%j.err
+#SBATCH --output=slurm/job.%x.%j.out
+#SBATCH --error=slurm/job.%x.%j.err
 
 echo "Starting at $(date)"
 echo "Cluster: $SLURM_CLUSTER_NAME"
@@ -1123,83 +1163,43 @@ echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 module purge
 module load apptainer
 
-# Create newhome
-mkdir /usr/users/zicola/trinotate_${SPECIES}
+# Create output directory if not existing
+if [ ! -d  /usr/users/zicola/trinotate_${SPECIES} ]; then
+  mkdir /usr/users/zicola/trinotate_${SPECIES}
+fi
 
 export APPTAINERENV_NEWHOME=/usr/users/zicola/trinotate_${SPECIES}
 export APPTAINERENV_SPECIES=$SPECIES
 
-apptainer run -C -B /usr/users/zicola -B /scratch/users/zicola/ /usr/users/zicola/bin/trinotate.v4.0.2.simg /scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/04_trinotate.sh
+apptainer run -C -B /usr/users/zicola -B /scratch/users/zicola/ /usr/users/zicola/bin/trinotate.v4.0.2.simg /scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/05_trinotate.sh
 
 ```
 
 Launch sbatch with the species argument.
 
-```{bash, eval=FALSE}
-sbatch --export=SPECIES="Amara_similata" sbatch_trinotate.sh
-```
 
-Works, now, all Trinotate output will go in `~/newhome` instead of `$HOME`.
-
-```{bash, eval=FALSE}
-sacct -j JOBID -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
-
-sacct -j 5411597  -o jobid,jobname,AllocCPUS,ReqMem,MaxRSS,Elapsed
-JobID           JobName  AllocCPUS     ReqMem     MaxRSS    Elapsed
------------- ---------- ---------- ---------- ---------- ----------
-5411597       trinotate         10        12G              12:43:41
-5411597.bat+      batch         10              8463548K   12:43:41
-5411597.ext+     extern         10                     0   12:43:41
-
-```
-
-12h40 needed.
-
-```{bash, eval=FALSE}
-ls ~/newhome/
-total 475232
--rw-r----- 1 zicola UANP 124819074 Jan 27 20:11 TrinotatePFAM.out
--rw-r----- 1 zicola UANP         0 Jan 27 19:36 __init.ok
-drwxr-x--- 2 zicola UANP         2 Jan 28 08:19 __trinotate_run_checkpts
--rw-r----- 1 zicola UANP  44173297 Jan 28 08:19 eggnog_mapper.emapper.annotations
--rw-r----- 1 zicola UANP   9483642 Jan 28 02:27 eggnog_mapper.emapper.hits
--rw-r----- 1 zicola UANP   2365038 Jan 28 08:19 eggnog_mapper.emapper.seed_orthologs
--rw-r----- 1 zicola UANP 135214516 Jan 28 02:16 infernal.log
--rw-r----- 1 zicola UANP     80487 Jan 28 02:16 infernal.out
--rw-r----- 1 zicola UANP 140305066 Jan 27 20:11 pfam.log
--rw-r----- 1 zicola UANP   1583830 Jan 27 19:36 uniprot_sprot.diamond.blastp.outfmt6
--rw-r----- 1 zicola UANP   1673060 Jan 27 19:36 uniprot_sprot.diamond.blastx.outfmt6
-
-```
-
-```{bash, eval=FALSE}
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
-
-587M Jan 28 08:19 database_Amara_similata.sqlite
-
-```
-
-
-## 05_trinotate.sh
+## 06_trinotate.sh
 
 Second step:
 - Run tmhmm and load results in database
 - Run signalp and load results in database
 - Generate Trinotate report and GO annotations
 
+`06_trinotate.sh`
+
 ```{bash, eval=FALSE}
 
 #!/bin/bash
-#SBATCH --job-name=05_trinotate
+#SBATCH --job-name=06_trinotate
 #SBATCH --nodes=1
 #SBATCH --partition=medium
-#SBATCH --time=20:00:00
+#SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=10G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=job-%x-%j.out
-#SBATCH --error=job-%x-%j.err
+#SBATCH --output=slurm/job.%x.%j.out
+#SBATCH --error=slurm/job.%x.%j.err
 
 echo "Starting at $(date)"
 echo "Cluster: $SLURM_CLUSTER_NAME"
@@ -1225,9 +1225,9 @@ export TRINOTATE_HOME=/usr/local/src/Trinotate
 
 # Path to Trinity and Transdecoder files
 export WORKPATH=/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
-export GENE_TRANS_MAP=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta.gene_trans_map
-export TRINITY_FASTA=${WORKPATH}/trinity_output/summary/${SPECIES}_trinity.fasta
-export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}_trinity.fasta.transdecoder.pep 
+export GENE_TRANS_MAP=${WORKPATH}/trinity_output/${SPECIES}.fasta.gene_trans_map
+export TRINITY_FASTA=${WORKPATH}/trinity_output/${SPECIES}.fasta
+export TRANSDECODER_PEP=${WORKPATH}/transdecoder_output/${SPECIES}.fasta.transdecoder.pep 
 
 # Database
 export TRINOTATE_DATA_DIR=/scratch/users/zicola/TRINOTATE_DATA_DIR
@@ -1302,130 +1302,97 @@ echo "##########################"
 
 ```
 
-
 ## Run
 
-
-### Step 04
-
-```{bash, eval=FALSE}
-
-sbatch --export=SPECIES="Anchomenus_dorsalis" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Amara_similata" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Pterostichus_melanarius" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Zabrus_tenebrioides" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Harpalus_affinis" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Harpalus_eous" sbatch_trinotate.sh
-
-sbatch --export=SPECIES="Poecilus_cupreus" sbatch_trinotate.sh
-
-```
-
-
-Job for Aphidius_rhopalosiphi overtime the 16 hours and was killed during infernal run. Relaunch with a 24h time. Trinotate should consider the checkpoint files in $HOME and start from infernal.
+### Run sbatch_05_trinotate.sh
 
 ```{bash, eval=FALSE}
 
-rm ~/trinotate_Aphidius_rhopalosiphi/infernal*
+sbatch --export=SPECIES="Anchomenus_dorsalis" sbatch_05_trinotate.sh
 
-\ls -1 trinotate_Aphidius_rhopalosiphi/__trinotate_run_checkpts/
-diamond.uniprot_sprot.blastp.loaded.ok
-diamond.uniprot_sprot.blastp.ok
-diamond.uniprot_sprot.blastx.loaded.ok
-diamond.uniprot_sprot.blastx.ok
-pfam_hmmsearch.ok
-pfam_hmmsearch_loading.ok
-pipeliner.36.cmds
+sbatch --export=SPECIES="Amara_similata" sbatch_05_trinotate.sh
 
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_05_trinotate.sh
 
-sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
+sbatch --export=SPECIES="Pterostichus_melanarius" sbatch_05_trinotate.sh
+
+sbatch --export=SPECIES="Zabrus_tenebrioides" sbatch_05_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_affinis" sbatch_05_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_eous" sbatch_05_trinotate.sh
+
+sbatch --export=SPECIES="Poecilus_cupreus" sbatch_05_trinotate.sh
 
 ```
 
-Yes, it skips all steps until infernal and continue there.
+### Run 06_trinotate.sh
 
-
-Job killed again due to time out but now at the emapper part. Relaunch again
-
+Wait this job is finished before launching `06_trinotate.sh`
 
 ```{bash, eval=FALSE}
 
-sbatch --export=SPECIES="Aphidius_rhopalosiphi" sbatch_trinotate.sh
+sbatch --export=SPECIES="Pterostichus_melanarius" 06_trinotate.sh
+
+sbatch --export=SPECIES="Zabrus_tenebrioides" 06_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_affinis" 06_trinotate.sh
+
+sbatch --export=SPECIES="Harpalus_eous" 06_trinotate.sh
+
+sbatch --export=SPECIES="Anchomenus_dorsalis" 06_trinotate.sh
+
+sbatch --export=SPECIES="Poecilus_cupreus" 06_trinotate.sh
+
+sbatch --export=SPECIES="Amara_similata" 06_trinotate.sh
+
+sbatch --export=SPECIES="Aphidius_rhopalosiphi" 06_trinotate.sh
 
 ```
 
-```{bash, eval=FALSE}
-# emapper.py  -i /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output/Aphidius_rhopalosiphi_trinity.fasta.transdecoder.pep --cpu 10 --data_dir /scratch/users/zicola/TRINOTATE_DATA_DIR/EGGNOG_DATA_DIR -o eggnog_mapper
-Output files detected in disk. Use --resume or --override to continue
-
-```
-
-Fail, I need first to remove the eggmapper content in `~/trinotate_Aphidius_rhopalosiphi` that was killed
-
-
-
-### Step 05
-
-Wait this job is finished before launching `05_trinotate.sh`
-
-```{bash, eval=FALSE}
-
-sbatch --export=SPECIES="Pterostichus_melanarius" 05_trinotate.sh
-
-sbatch --export=SPECIES="Zabrus_tenebrioides" 05_trinotate.sh
-
-sbatch --export=SPECIES="Harpalus_affinis" 05_trinotate.sh
-
-sbatch --export=SPECIES="Harpalus_eous" 05_trinotate.sh
-
-sbatch --export=SPECIES="Anchomenus_dorsalis" 05_trinotate.sh
-
-sbatch --export=SPECIES="Poecilus_cupreus" 05_trinotate.sh
-
-sbatch --export=SPECIES="Amara_similata" 05_trinotate.sh
-
-sbatch --export=SPECIES="Aphidius_rhopalosiphi" 05_trinotate.sh
-
-```
 
 ## Gather annotations
 
 ```{bash, eval=FALSE}
 
-find . -name "Trinotate_report.tsv" -exec gzip {} \;
-
 while read i; do
-   cp ${i}/Trinotate_report.tsv.gz summary_trinotate/${i}_Trinotate_report.tsv.gz
-done < list_species.txt
+   cp ${i}/Trinotate_report.tsv summary_trinotate/${i}_Trinotate_report.tsv
+done < ../list_species.txt
+
+# Gather GO term annotations
+while read i; do
+   cp ${i}/Trinotate_report.tsv.gene_ontology summary_trinotate_GO/${i}_Trinotate_report.tsv.gene_ontology
+done < ../list_species.txt
 
 ```
+
+Create an archive to reduce the size
+
+```{bash, eval=FALSE}
+
+tar -czf trinotate_annotations.tar.gz *tsv
+
+```
+
 
 # BUSCO
 
-Based on the odb10 list (`busco --list-datasets`), there are no coleoptera database. I would therefore use insecta_odb12 to be more general. However, for Aphidius_rhopalosiphi, I can use the hymenoptera_odb10 database.
-
-See doc on https://busco.ezlab.org/busco_userguide.html#running-busco
+Based on the odb10 list (`busco --list-datasets`), there are no coleoptera database. I would therefore use insecta_odb10 to be more general. This database contains 1367 marker genes from 75 species. See doc on https://busco.ezlab.org/busco_userguide.html#running-busco
 
 ```{bash, eval=FALSE}
-busco --list-datasets
-```
+module load busco/5.4.3
 
+busco --list-datasets
+
+```
 
 ## Get longest isoforms
 
 ```{bash, eval=FALSE}
 
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
+module load apptainer
 
-export WORKDIR=/usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
+WORKDIR="/scratch/users/zicola/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output"
 
 for i in *fasta; do
    apptainer exec -e -C -B $WORKDIR /usr/users/zicola/bin/trinityrnaseq.v2.15.1.simg \
@@ -1434,45 +1401,7 @@ done
 
 ```
 
-```{bash, eval=FALSE}
-seqkit stats *
-processed files:  9 / 9 [======================================] ETA: 0s. done
-file                                                    format  type  num_seqs     sum_len  min_len  avg_len  max_len
-Amara_similata_trinity.longest_isoforms.fasta           FASTA   DNA     45,382  39,170,740      201    863.1   24,631
-Anchomenus_dorsalis_trinity.longest_isoforms.fasta      FASTA   DNA     64,702  49,429,920      201      764   33,453
-Aphidius_rhopalosiphi_trinity.longest_isoforms.fasta    FASTA   DNA    201,906  96,690,872      201    478.9   35,915
-Harpalus_affinis_trinity.longest_isoforms.fasta         FASTA   DNA     62,673  45,743,303      201    729.9   25,018
-Harpalus_eous_trinity.longest_isoforms.fasta            FASTA   DNA     63,803  46,868,568      201    734.6   20,450
-Poecilus_cupreus_trinity.longest_isoforms.fasta         FASTA   DNA     56,672  47,028,774      201    829.8   24,578
-Pterostichus_melanarius_trinity.longest_isoforms.fasta  FASTA   DNA     92,836  57,883,850      201    623.5   26,406
-Zabrus_tenebrioides_trinity.longest_isoforms.fasta      FASTA   DNA     51,663  43,363,104      201    839.3   26,778
-longest_isoforms.fasta                                  FASTA   DNA     51,663  43,363,104      201    839.3   26,778
-
-```
-
-
-Compared to the number of peptides from Transdecoder
-
-```{bash, eval=FALSE}
-cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/transdecoder_output
-
-seqkit stats *pep
-
-processed files:  8 / 8 [======================================] ETA: 0s. done
-file                                                    format  type     num_seqs     sum_len  min_len  avg_len  max_len
-Amara_similata_trinity.fasta.transdecoder.pep           FASTA   Protein    30,556  14,245,018       88    466.2    7,989
-Anchomenus_dorsalis_trinity.fasta.transdecoder.pep      FASTA   Protein    44,842  18,688,372       87    416.8   11,078
-Aphidius_rhopalosiphi_trinity.fasta.transdecoder.pep    FASTA   Protein    40,022  14,313,010       85    357.6   11,722
-Harpalus_affinis_trinity.fasta.transdecoder.pep         FASTA   Protein    41,824  17,869,618       86    427.3    7,821
-Harpalus_eous_trinity.fasta.transdecoder.pep            FASTA   Protein    37,651  15,771,161       86    418.9    5,529
-Poecilus_cupreus_trinity.fasta.transdecoder.pep         FASTA   Protein    42,557  19,020,139       87    446.9    7,179
-Pterostichus_melanarius_trinity.fasta.transdecoder.pep  FASTA   Protein    47,305  18,248,733       85    385.8    8,424
-Zabrus_tenebrioides_trinity.fasta.transdecoder.pep      FASTA   Protein    34,677  14,622,474       85    421.7    8,600
-
-```
-
-
-## Run BUSCO
+## 07_busco.sh
 
 ```{bash, eval=FALSE}
 #!/bin/bash
@@ -1483,8 +1412,8 @@ Zabrus_tenebrioides_trinity.fasta.transdecoder.pep      FASTA   Protein    34,67
 #SBATCH --mem=8G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --output=busco.%J.out
-#SBATCH --error=busco.%J.err
+#SBATCH --output=slurm/job.%x.%J.out
+#SBATCH --error=slurm/job.%x.%J.err
 
 echo "Starting at $(date)"
 echo "Cluster: $SLURM_CLUSTER_NAME"
@@ -1494,45 +1423,38 @@ echo "RAM: $(($SLURM_MEM_PER_NODE/1024))GB"
 
 module load busco/5.4.3
 
-busco -i $TRINITY_FILE -m transcriptome --lineage_dataset insecta_odb10 --cpu 8 --out busco_output/$SPECIES
+busco -i $TRINITY_FILE -m transcriptome \
+   --lineage_dataset insecta_odb10 --cpu 8 \
+   --out busco_output/$SPECIES
 
 ```
 
-
 ```{bash, eval=FALSE}
-
 cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary
 
+# Run alone first instance to allow busco to download insecta_odb10 database
+sbatch --export=TRINITY_FILE=trinity_output/longest_isoforms/Amara_similata.longest_isoforms.fasta,SPECIES=Amara_similata 07_busco.sh
+
 while read i; do
-sbatch --export=TRINITY_FILE=longest_isoforms/${i}_trinity.longest_isoforms.fasta,SPECIES=$i ../../06_busco.sh
-done < species.txt
-
-sbatch --export=TRINITY_FILE=longest_isoforms/Pterostichus_melanarius_trinity.longest_isoforms.fasta,SPECIES=Pterostichus_melanarius ../../06_busco.sh
-
-```
-
-## Separate run for Aphidius_rhopalosiphi
-
-Do a second run for Aphidius which is a hymenoptera
-
-hymenoptera_odb10
-
-```{bash, eval=FALSE}
-srun --time=00:20:00 --cpus-per-task=8 --mem=8G -p medium busco -i longest_isoforms/Aphidius_rhopalosiphi_trinity.longest_isoforms.fasta -m transcriptome --lineage_dataset hymenoptera_odb10 --cpu 8 --out busco_output/Aphidius_rhopalosiphi_hymenoptera_odb10 &
+  if [ ! -d busco_output/$i ]; then
+    sbatch --export=TRINITY_FILE=trinity_output/longest_isoforms/${i}.longest_isoforms.fasta,SPECIES=$i 07_busco.sh
+  fi
+done < list_species.txt
 
 ```
-
 
 ## Summarize BUSCO results
 
 ```{bash, eval=FALSE}
 cd /usr/users/npghpc/data/NGS_data/BGI_data/F22FTSEUHT1495_LIBgsmfR_judi_8_insects/trinity_output/summary/busco_output/
 
-mkdir my_summaries
+mkdir busco_summary
 
-find . -maxdepth 2 -name "short_summary*txt" -exec cp {} my_summaries/ \;
+find . -maxdepth 2 -name "short_summary*txt" -exec cp {} busco_summary/ \;
 
-python /usr/product/bioinfo/BUSCO/5.4.3/bin/generate_plot.py -wd my_summaries
+module load busco/5.4.3
+
+python /usr/product/bioinfo/BUSCO/5.4.3/bin/generate_plot.py -wd busco_summary
 
 ```
 
@@ -1556,7 +1478,7 @@ library("grid")
 
 # !!! CONFIGURE YOUR PLOT HERE !!!
 # Output
-my_output <- paste("my_summaries/","busco_figure.png",sep="/")
+my_output <- paste("busco_summary/","busco_figure.png",sep="/")
 my_width <- 20
 my_height <- 15
 my_unit <- "cm"
@@ -1575,11 +1497,11 @@ my_size_ratio <- 1
 
 # !!! SEE YOUR DATA HERE !!!
 # Your data as generated by python, remove or add more
-my_species <- c('Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi_hymenoptera_odb10', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis')
+my_species <- c('Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis')
 my_species <- factor(my_species)
 my_species <- factor(my_species,levels(my_species)[c(length(levels(my_species)):1)]) # reorder your species here just by changing the values in the vector :
-my_percentage <- c(84.9, 13.1, 1.0, 1.0, 91.1, 5.6, 1.5, 1.8, 74.1, 1.6, 7.7, 16.6, 91.1, 3.0, 2.3, 3.6, 96.0, 0.7, 1.1, 2.2, 93.8, 2.9, 0.8, 2.5, 94.7, 3.1, 0.7, 1.5, 94.3, 1.9, 1.5, 2.3, 95.4, 1.7, 1.0, 1.9)
-my_values <- c(1160, 179, 14, 14, 1246, 76, 20, 25, 4441, 96, 459, 995, 1245, 41, 32, 49, 1313, 9, 15, 30, 1282, 40, 11, 34, 1295, 43, 10, 19, 1289, 26, 20, 32, 1304, 23, 14, 26)
+my_percentage <- c(94.7, 1.8, 1.3, 2.2, 85.4, 12.9, 0.7, 1.0, 93.9, 2.6, 1.0, 2.5, 95.8, 0.7, 1.3, 2.2, 95.0, 3.1, 0.8, 1.1, 91.8, 5.0, 1.2, 2.0, 91.2, 3.1, 2.6, 3.1, 95.6, 1.6, 1.1, 1.7)
+my_values <- c(1295, 24, 18, 30, 1167, 177, 10, 13, 1284, 35, 14, 34, 1309, 9, 18, 31, 1298, 43, 11, 15, 1255, 68, 16, 28, 1247, 43, 35, 42, 1307, 22, 15, 23)
 
 ######################################
 ######################################
@@ -1609,205 +1531,43 @@ figure <- ggplot() +
   xlab("") +
   ylab("\n%BUSCOs") +
 
-  theme(plot.title = element_text(family=my_family, hjust=0.5, colour = "black", size = rel(2.2)*my_size_ratio, face = "bold")) +
-  theme(legend.position="top",legend.title = element_blank()) +
-  theme(legend.text = element_text(family=my_family, size = rel(1.2)*my_size_ratio)) +
-  theme(panel.background = element_rect(color="#FFFFFF", fill="white")) +
-  theme(panel.grid.minor = element_blank()) +
-  theme(panel.grid.major = element_blank()) +
-  theme(axis.text.y = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
-  theme(axis.text.x = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
-  theme(axis.line = element_line(size=1*my_size_ratio, colour = "black")) +
-  theme(axis.ticks.length = unit(.85, "cm")) +
-  theme(axis.ticks.y = element_line(colour="white", size = 0)) +
-  theme(axis.ticks.x = element_line(colour="#222222")) +
-  theme(axis.ticks.length = unit(0.4, "cm")) +
-  theme(axis.title.x = element_text(family=my_family, size=rel(1.2)*my_size_ratio)) +
+  theme(plot.title = element_text(family = my_family, hjust = 0.5, colour = "black", size = rel(2.2) * my_size_ratio, face = "bold")) +
+    theme(legend.position = "top", legend.title = element_blank()) +
+    theme(legend.text = element_text(family = my_family, size = rel(1.2) * my_size_ratio)) +
+    theme(panel.background = element_rect(color = "#FFFFFF", fill = "white")) +
+    theme(panel.grid.minor = element_blank()) +
+    theme(panel.grid.major = element_blank()) +
+    theme(axis.text.y = element_text(family = my_family, colour = "black", size = rel(1.66) * my_size_ratio)) +
+    theme(axis.text.x = element_text(family = my_family, colour = "black", size = rel(1.66) * my_size_ratio)) +
+    theme(axis.line = element_line(size = 1 * my_size_ratio, colour = "black")) +
+    theme(axis.ticks.length = unit(.85, "cm")) +
+    theme(axis.ticks.y = element_line(colour = "white", size = 0)) +
+    theme(axis.ticks.x = element_line(colour = "#222222")) +
+    theme(axis.ticks.length = unit(0.4, "cm")) +
+    theme(axis.title.x = element_text(family = my_family, size = rel(1.2) * my_size_ratio)) +
+    guides(fill = guide_legend(override.aes = list(colour = NULL))) +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE))
 
-  guides(fill = guide_legend(override.aes = list(colour = NULL))) +
-  guides(fill=guide_legend(nrow=2,byrow=TRUE))
-
-  for(i in rev(c(1:length(levels(my_species))))){
-    detailed_values <- my_values[my_species==my_species[my_species==levels(my_species)[i]]]
+  for (i in rev(c(1:length(levels(my_species))))) {
+    detailed_values <- my_values[my_species == my_species[my_species == levels(my_species)[i]]]
     total_buscos <- sum(detailed_values)
     figure <- figure +
-    annotate("text", label=paste("C:", detailed_values[1] + detailed_values[2], " [S:", detailed_values[1], ", D:", detailed_values[2], "], F:", detailed_values[3], ", M:", detailed_values[4], ", n:", total_buscos, sep=""),
-             y=3, x = i, size = labsize*4*my_size_ratio, colour = "black", hjust=0, family=my_family)
+      annotate("text",
+        label = paste("C:", detailed_values[1] + detailed_values[2], " [S:", detailed_values[1], ", D:", detailed_values[2], "], F:", detailed_values[3], ", M:", detailed_values[4], ", n:", total_buscos, sep = ""),
+        y = 3, x = i, size = labsize * 4 * my_size_ratio, colour = "black", hjust = 0, family = my_family
+      )
   }
-
-figure
-
-```
-
-Using the hymenoptera database for _Aphidium rhopalosiphi_ yields to lower completedness than while using insecta database. It can be due to the fact that we use only the adult stage and that only a subset of genes are expressed in the adult analyzed. 
-
-Without hymenoptera analysis
-
-```{bash, eval=FALSE}
-rm my_summaries/short_summary.specific.hymenoptera_odb10.Aphidius_rhopalosiphi_hymenoptera_odb10.txt
-
-python /usr/product/bioinfo/BUSCO/5.4.3/bin/generate_plot.py -wd my_summaries
-```
-
-```{r}
-######################################
-#
-# BUSCO summary figure
-# @version 4.0.0
-# @since BUSCO 2.0.0
-#
-# Copyright (c) 2016-2022, Evgeny Zdobnov (ez@ezlab.org)
-# Licensed under the MIT license. See LICENSE.md file.
-#
-######################################
-
-# Load the required libraries
-library(ggplot2)
-library("grid")
-
-# !!! CONFIGURE YOUR PLOT HERE !!!
-# Output
-my_output <- paste("my_summaries/","busco_figure.png",sep="/")
-my_width <- 20
-my_height <- 15
-my_unit <- "cm"
-
-# Colors
-my_colors <- c("#56B4E9", "#3492C7", "#F0E442", "#F04442")
-# Bar height ratio
-my_bar_height <- 0.75
-
-# Legend
-my_title <- "BUSCO Assessment Results"
-
-# Font
-my_family <- "sans"
-my_size_ratio <- 1
-
-# !!! SEE YOUR DATA HERE !!!
-# Your data as generated by python, remove or add more
-my_species <- c('Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Anchomenus_dorsalis', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Pterostichus_melanarius', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Aphidius_rhopalosiphi', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Amara_similata', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Zabrus_tenebrioides', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Poecilus_cupreus', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_eous', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis', 'Harpalus_affinis')
-my_species <- factor(my_species)
-my_species <- factor(my_species,levels(my_species)[c(length(levels(my_species)):1)]) # reorder your species here just by changing the values in the vector :
-my_percentage <- c(84.9, 13.1, 1.0, 1.0, 91.1, 5.6, 1.5, 1.8, 91.1, 3.0, 2.3, 3.6, 96.0, 0.7, 1.1, 2.2, 93.8, 2.9, 0.8, 2.5, 94.7, 3.1, 0.7, 1.5, 94.3, 1.9, 1.5, 2.3, 95.4, 1.7, 1.0, 1.9)
-my_values <- c(1160, 179, 14, 14, 1246, 76, 20, 25, 1245, 41, 32, 49, 1313, 9, 15, 30, 1282, 40, 11, 34, 1295, 43, 10, 19, 1289, 26, 20, 32, 1304, 23, 14, 26)
-
-######################################
-######################################
-######################################
-# Code to produce the graph
-labsize = 1
-if (length(levels(my_species)) > 10){
- labsize = 0.66
-}
-print("Plotting the figure ...")
-category <- c(rep(c("S","D","F","M"),c(1)))
-category <-factor(category)
-category = factor(category,levels(category)[c(4,1,2,3)])
-df = data.frame(my_species,my_percentage,my_values,category)
-
-figure <- ggplot() +
-
-  geom_bar(aes(y = my_percentage, x = my_species, fill = category), position = position_stack(reverse = TRUE), data = df, stat="identity", width=my_bar_height) +
-  coord_flip() +
-  theme_gray(base_size = 8) +
-  scale_y_continuous(labels = c("0","20","40","60","80","100"), breaks = c(0,20,40,60,80,100)) +
-  scale_fill_manual(values = my_colors,labels =c(" Complete (C) and single-copy (S)  ",
-                                                 " Complete (C) and duplicated (D)",
-                                                 " Fragmented (F)  ",
-                                                 " Missing (M)")) +
-  ggtitle(my_title) +
-  xlab("") +
-  ylab("\n%BUSCOs") +
-
-  theme(plot.title = element_text(family=my_family, hjust=0.5, colour = "black", size = rel(2.2)*my_size_ratio, face = "bold")) +
-  theme(legend.position="top",legend.title = element_blank()) +
-  theme(legend.text = element_text(family=my_family, size = rel(1.2)*my_size_ratio)) +
-  theme(panel.background = element_rect(color="#FFFFFF", fill="white")) +
-  theme(panel.grid.minor = element_blank()) +
-  theme(panel.grid.major = element_blank()) +
-  theme(axis.text.y = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
-  theme(axis.text.x = element_text(family=my_family, colour = "black", size = rel(1.66)*my_size_ratio)) +
-  theme(axis.line = element_line(size=1*my_size_ratio, colour = "black")) +
-  theme(axis.ticks.length = unit(.85, "cm")) +
-  theme(axis.ticks.y = element_line(colour="white", size = 0)) +
-  theme(axis.ticks.x = element_line(colour="#222222")) +
-  theme(axis.ticks.length = unit(0.4, "cm")) +
-  theme(axis.title.x = element_text(family=my_family, size=rel(1.2)*my_size_ratio)) +
-
-  guides(fill = guide_legend(override.aes = list(colour = NULL))) +
-  guides(fill=guide_legend(nrow=2,byrow=TRUE))
-
-  for(i in rev(c(1:length(levels(my_species))))){
-    detailed_values <- my_values[my_species==my_species[my_species==levels(my_species)[i]]]
-    total_buscos <- sum(detailed_values)
-    figure <- figure +
-    annotate("text", label=paste("C:", detailed_values[1] + detailed_values[2], " [S:", detailed_values[1], ", D:", detailed_values[2], "], F:", detailed_values[3], ", M:", detailed_values[4], ", n:", total_buscos, sep=""),
-             y=3, x = i, size = labsize*4*my_size_ratio, colour = "black", hjust=0, family=my_family)
-  }
-
-figure
 
 #ggsave(figure, file=my_output, width = my_width, height = my_height, unit = my_unit)
-#print("Done")
+
+figure
 
 ```
 
-We see a higher rate of duplication for _Anchoenus dorsalis_.
+![](images/busco_summary.png)
+
+We see a higher rate of duplication for _Anchomenus dorsalis_.
 
 
-# ##################################
-
-# Off-target analysis
-
-This job will be done by the partner company Eupheria Biotech GmbH (https://www.fisaonline.de/einrichtungen-finden/details/?tx_fisaresearch_institutions%5Baction%5D=institutionDetails&tx_fisaresearch_institutions%5Bcontroller%5D=Institutions&tx_fisaresearch_institutions%5Bi_id%5D=5804&cHash=f826a8e38b4decbcd499614c8e5f051e#more)
-
-
-
-Use Doga's script (https://figshare.com/articles/dataset/_i_in_silico_i_off-target_analysis_of_lethal_genes_in_cabbage_stem_flea_beetle/25283683?file=44671225) (scripts/off_target_prediction_lethal.py)
-
-# COI1 validation
-
-
-Di mentioned that to verify if we have the correct species, one needs to look at the cytochrome oxidase subunit 1 (COI) sequence.
-
-
-The gene is encoded within the Mt so we can't expect to have the transcript in our assemblies (polyA enrichment).
-
-Di used DNA + PCR (see paper https://bdj.pensoft.net/article/117014/)
-
-01_Ad
-Anchomenus dorsalis (NCBI taxonomy ID 586010)
-https://www.ncbi.nlm.nih.gov/nuccore/HQ953549.1
-
-https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=586010
-
-02_Pt
-Pterostichus melanarius (NCBI taxonomy ID 60768)
-https://www.ncbi.nlm.nih.gov/nuccore/MH020387.1
-
-03_Zt
-Zabrus tenebrioides (NCBI taxonomy ID 272042)
-https://www.ncbi.nlm.nih.gov/nuccore/ON623806.2
-
-04_Asp
-Amara similata (=Harpalus similatus) (NCBI taxonomy ID 272013)
-https://www.ncbi.nlm.nih.gov/nuccore/MH020396.1
-
-05_G
-Harpalus affinis (NCBI taxonomy ID 247283)
-https://www.ncbi.nlm.nih.gov/nuccore/OK638137.1
-
-06_Ol
-Harpalus eous (NCBI taxonomy ID 2107211)
-https://www.ncbi.nlm.nih.gov/nuccore/LC764887.1
-
-07_Pr
-Poecilus cupreus (=Pterostichus cupreus) (NCBI taxonomy ID 270614)
-https://www.ncbi.nlm.nih.gov/nuccore/MN454673.1
-
-08_Ar
-Aphidius rhopalosiphi (NCBI taxonomy ID 55891)
-https://www.ncbi.nlm.nih.gov/nuccore/JN164779.1
 
 
